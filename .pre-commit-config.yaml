@@ -1,0 +1,43 @@
+ci:
+  autofix_commit_msg: "chore: Fix lint errors"
+  autofix_prs: true
+  autoupdate_branch: main
+  autoupdate_commit_msg: "chore: Update pre-commit hooks"
+  autoupdate_schedule: monthly
+  submodules: false
+  skip:
+    - uv-lock
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: no-commit-to-branch
+        args: [--branch, main]
+      - id: trailing-whitespace
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.3
+    hooks:
+      - id: ruff-check
+        args: [--fix, --exit-non-zero-on-fix, --show-fixes]
+      - id: ruff-format
+
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.33.2
+    hooks:
+      - id: check-github-workflows
+      - id: check-meltano
+      - id: check-renovate
+        language: python
+        additional_dependencies:
+        - pyjson5==1.6.8
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: "0.7.21"
+    hooks:
+      - id: uv-lock
+      - id: uv-sync

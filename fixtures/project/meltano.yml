@@ -1,0 +1,15 @@
+version: 1
+default_environment: dev
+project_id: 1ec76bd8-4499-4bad-a974-b27225d75f12
+send_anonymous_usage_stats: false
+environments:
+- name: dev
+state_backend:
+  uri: snowflake://my-account
+  snowflake:
+    warehouse: test_warehouse
+    database: test_database
+    schema: test_schema
+    role: test_role
+    user: test_user
+    password: test_password
