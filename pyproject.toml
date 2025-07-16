@@ -204,3 +204,6 @@ commands = [
     ], extend = true },
   ],
 ]
+
+[tool.uv.sources]
+meltano = { git = "https://github.com/meltano/meltano.git", rev = "main" }
