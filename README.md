@@ -95,7 +95,7 @@ uv sync
 Run all tests, type checks, linting, and coverage:
 
 ```bash
-uvx -with tox-uv tox run-parallel
+uvx --with tox-uv tox run-parallel
 ```
 
 ### Bump the version
