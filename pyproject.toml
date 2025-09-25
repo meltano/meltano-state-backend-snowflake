@@ -26,13 +26,16 @@ classifiers = [
 ]
 dependencies = [
   "meltano>=3.7",
-  "snowflake-connector-python>=3,<4",
+  "snowflake-connector-python[cryptography]>=3,<4",
 ]
 
 [project.entry-points."meltano.settings"]
 snowflake_account = "meltano_state_backend_snowflake.backend:SNOWFLAKE_ACCOUNT"
 snowflake_database = "meltano_state_backend_snowflake.backend:SNOWFLAKE_DATABASE"
 snowflake_password = "meltano_state_backend_snowflake.backend:SNOWFLAKE_PASSWORD"
+snowflake_private_key_passphrase = "meltano_state_backend_snowflake.backend:SNOWFLAKE_PRIVATE_KEY_PASSPHRASE"
+snowflake_private_key_path = "meltano_state_backend_snowflake.backend:SNOWFLAKE_PRIVATE_KEY_PATH"
+snowflake_private_key_base64 = "meltano_state_backend_snowflake.backend:SNOWFLAKE_PRIVATE_KEY_BASE64"
 snowflake_role = "meltano_state_backend_snowflake.backend:SNOWFLAKE_ROLE"
 snowflake_schema = "meltano_state_backend_snowflake.backend:SNOWFLAKE_SCHEMA"
 snowflake_user = "meltano_state_backend_snowflake.backend:SNOWFLAKE_USER"

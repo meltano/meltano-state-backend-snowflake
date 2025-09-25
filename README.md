@@ -42,6 +42,28 @@ state_backend:
     role: my_role           # Optional: The role to use for the connection
 ```
 
+#### Key-Pair Authentication
+
+For better security, you can use RSA key-pair authentication. You can provide the key either as a path to the file or as a Base64 encoded string.
+
+```yaml
+state_backend:
+  uri: snowflake://my_user@my_account/my_database/my_schema
+  snowflake:
+    warehouse: my_warehouse
+    private_key_base64: "MII..." # Your base64 encoded private key string
+    private_key_passphrase: "your-passphrase" # Omit if key is not encrypted
+```
+
+#### Using a Base64 encoded key:
+```yaml
+state_backend:
+  uri: snowflake://my_user@my_account/my_database/my_schema
+  snowflake:
+    warehouse: my_warehouse
+    private_key_path: /path/to/your/rsa_key.p8
+    private_key_passphrase: "your-passphrase" # Omit if key is not encrypted
+```
 Alternatively, you can provide credentials via individual settings:
 
 ```yaml

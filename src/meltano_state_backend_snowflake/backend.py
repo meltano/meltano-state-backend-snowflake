@@ -1,15 +1,18 @@
 """StateStoreManager for Snowflake state backend."""
 
 from __future__ import annotations
-
+import base64
 import json
 import typing as t
 from contextlib import contextmanager
 from functools import cached_property
+from pathlib import Path
 from time import sleep
 from urllib.parse import urlparse
 
 import snowflake.connector
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
 from meltano.core.error import MeltanoError
 from meltano.core.setting_definition import SettingDefinition, SettingKind
 from meltano.core.state_store.base import (
@@ -47,6 +50,31 @@ SNOWFLAKE_PASSWORD = SettingDefinition(
     name="state_backend.snowflake.password",
     label="Snowflake Password",
     description="Snowflake password",
+    kind=SettingKind.STRING,
+    sensitive=True,
+    env_specific=True,
+)
+SNOWFLAKE_PRIVATE_KEY_PATH = SettingDefinition(
+    name="state_backend.snowflake.private_key_path",
+    label="Snowflake Private Key Path",
+    description="Path to the RSA private key file for key-pair authentication.",
+    kind=SettingKind.STRING,
+    env_specific=True,
+)
+
+SNOWFLAKE_PRIVATE_KEY_BASE64 = SettingDefinition(
+    name="state_backend.snowflake.private_key_base64",
+    label="Snowflake Private Key (Base64)",
+    description="Base64-encoded RSA private key for key-pair authentication.",
+    kind=SettingKind.STRING,
+    sensitive=True,
+    env_specific=True,
+)
+
+SNOWFLAKE_PRIVATE_KEY_PASSPHRASE = SettingDefinition(
+    name="state_backend.snowflake.private_key_passphrase",
+    label="Snowflake Private Key Passphrase",
+    description="Passphrase for an encrypted RSA private key.",
     kind=SettingKind.STRING,
     sensitive=True,
     env_specific=True,
@@ -103,6 +131,9 @@ class SnowflakeStateStoreManager(StateStoreManager):
         warehouse: str | None = None,
         database: str | None = None,
         schema: str | None = None,
+        private_key_path: str | None = None,
+        private_key_base64: str | None = None,
+        private_key_passphrase: str | None = None,
         role: str | None = None,
         **kwargs: t.Any,
     ) -> None:
@@ -116,6 +147,9 @@ class SnowflakeStateStoreManager(StateStoreManager):
             warehouse: Snowflake compute warehouse
             database: Snowflake database name
             schema: Snowflake schema name (default: PUBLIC)
+            private_key_path: Path to the RSA private key file.
+            private_key_base64: Base64-encoded RSA private key.
+            private_key_passphrase: Passphrase for the private key.
             role: Optional Snowflake role to use
             kwargs: Additional keyword args to pass to parent
 
@@ -136,8 +170,13 @@ class SnowflakeStateStoreManager(StateStoreManager):
             raise MissingStateBackendSettingsError(msg)
 
         self.password = password or parsed.password
-        if not self.password:
-            msg = "Snowflake password is required"
+        self.private_key_path = private_key_path
+        self.private_key_base64 = private_key_base64
+        self.private_key_passphrase = private_key_passphrase
+        
+        # CORRECTED AUTH CHECK: Ensure at least one auth method is provided
+        if not self.password and not self.private_key_path and not self.private_key_base64:
+            msg = "Snowflake password or private key (path or base64) is required"
             raise MissingStateBackendSettingsError(msg)
 
         self.warehouse = warehouse
@@ -168,14 +207,44 @@ class SnowflakeStateStoreManager(StateStoreManager):
         conn_params = {
             "account": self.account,
             "user": self.user,
-            "password": self.password,
             "warehouse": self.warehouse,
             "database": self.database,
             "schema": self.schema,
         }
         if self.role:
             conn_params["role"] = self.role
+            
+        if self.private_key_path or self.private_key_base64:
+            private_key_bytes = None
+            if self.private_key_path:
+                private_key_bytes = Path(self.private_key_path).read_bytes()
+            elif self.private_key_base64:
+                private_key_bytes = base64.b64decode(self.private_key_base64)
 
+            if not private_key_bytes:
+                msg = "Could not read private key from path or base64."
+                raise SnowflakeStateBackendError(msg)
+
+            passphrase = (
+                self.private_key_passphrase.encode()
+                if self.private_key_passphrase
+                else None
+            )
+
+            p_key = serialization.load_pem_private_key(
+                private_key_bytes,
+                password=passphrase,
+                backend=default_backend(),
+            )
+            pkb = p_key.private_bytes(
+                encoding=serialization.Encoding.DER,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=serialization.NoEncryption(),
+            )
+            conn_params["private_key"] = pkb
+        else:
+            conn_params["password"] = self.password
+            
         return snowflake.connector.connect(**conn_params)
 
     def _ensure_tables(self) -> None:
