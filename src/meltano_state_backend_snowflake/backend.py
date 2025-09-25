@@ -1,6 +1,7 @@
 """StateStoreManager for Snowflake state backend."""
 
 from __future__ import annotations
+
 import base64
 import json
 import typing as t
@@ -173,7 +174,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
         self.private_key_path = private_key_path
         self.private_key_base64 = private_key_base64
         self.private_key_passphrase = private_key_passphrase
-        
+
         # CORRECTED AUTH CHECK: Ensure at least one auth method is provided
         if not self.password and not self.private_key_path and not self.private_key_base64:
             msg = "Snowflake password or private key (path or base64) is required"
@@ -213,7 +214,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
         }
         if self.role:
             conn_params["role"] = self.role
-            
+
         if self.private_key_path or self.private_key_base64:
             private_key_bytes = None
             if self.private_key_path:
@@ -226,9 +227,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
                 raise SnowflakeStateBackendError(msg)
 
             passphrase = (
-                self.private_key_passphrase.encode()
-                if self.private_key_passphrase
-                else None
+                self.private_key_passphrase.encode() if self.private_key_passphrase else None
             )
 
             p_key = serialization.load_pem_private_key(
@@ -244,7 +243,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
             conn_params["private_key"] = pkb
         else:
             conn_params["password"] = self.password
-            
+
         return snowflake.connector.connect(**conn_params)
 
     def _ensure_tables(self) -> None:
