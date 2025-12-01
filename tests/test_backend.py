@@ -77,6 +77,8 @@ def test_get_manager(project: Project) -> None:
 )
 def test_settings(project: Project, setting_name: str, env_var_name: str) -> None:
     setting = project.settings.find_setting(setting_name)
+    assert setting is not None
+
     env_vars = setting.env_vars(prefixes=["meltano"])
     assert env_vars[0].key == env_var_name
 
@@ -542,7 +544,7 @@ def test_acquire_lock_max_retries_exceeded(
         ),
     ):
         with manager.acquire_lock("test_job", retry_seconds=retry_seconds):  # type: ignore[arg-type]
-            pass
+            pass  # pragma: no cover
 
     assert mock_sleep.call_count == int(30 / retry_seconds) - 1
 
@@ -566,7 +568,7 @@ def test_acquire_lock_other_programming_error(
         mock.patch("meltano_state_backend_snowflake.backend.sleep") as mock_sleep,
     ):
         with manager.acquire_lock("test_job", retry_seconds=0.01):  # type: ignore[arg-type]
-            pass
+            pass  # pragma: no cover
 
     mock_sleep.assert_not_called()
 
