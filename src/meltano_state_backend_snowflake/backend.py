@@ -31,7 +31,7 @@ SNOWFLAKE_ACCOUNT = SettingDefinition(
     name="state_backend.snowflake.account",
     label="Snowflake Account",
     description="Snowflake account identifier",
-    kind=SettingKind.STRING,
+    kind=SettingKind.STRING,  # ty: ignore[invalid-argument-type]
     env_specific=True,
 )
 
@@ -39,7 +39,7 @@ SNOWFLAKE_USER = SettingDefinition(
     name="state_backend.snowflake.user",
     label="Snowflake User",
     description="Snowflake username",
-    kind=SettingKind.STRING,
+    kind=SettingKind.STRING,  # ty: ignore[invalid-argument-type]
     env_specific=True,
 )
 
@@ -47,7 +47,7 @@ SNOWFLAKE_PASSWORD = SettingDefinition(
     name="state_backend.snowflake.password",
     label="Snowflake Password",
     description="Snowflake password",
-    kind=SettingKind.STRING,
+    kind=SettingKind.STRING,  # ty: ignore[invalid-argument-type]
     sensitive=True,
     env_specific=True,
 )
@@ -56,7 +56,7 @@ SNOWFLAKE_WAREHOUSE = SettingDefinition(
     name="state_backend.snowflake.warehouse",
     label="Snowflake Warehouse",
     description="Snowflake compute warehouse",
-    kind=SettingKind.STRING,
+    kind=SettingKind.STRING,  # ty: ignore[invalid-argument-type]
     env_specific=True,
 )
 
@@ -64,7 +64,7 @@ SNOWFLAKE_DATABASE = SettingDefinition(
     name="state_backend.snowflake.database",
     label="Snowflake Database",
     description="Snowflake database name",
-    kind=SettingKind.STRING,
+    kind=SettingKind.STRING,  # ty: ignore[invalid-argument-type]
     env_specific=True,
 )
 
@@ -72,7 +72,7 @@ SNOWFLAKE_SCHEMA = SettingDefinition(
     name="state_backend.snowflake.schema",
     label="Snowflake Schema",
     description="Snowflake schema name",
-    kind=SettingKind.STRING,
+    kind=SettingKind.STRING,  # ty: ignore[invalid-argument-type]
     default="PUBLIC",
     env_specific=True,
 )
@@ -81,7 +81,7 @@ SNOWFLAKE_ROLE = SettingDefinition(
     name="state_backend.snowflake.role",
     label="Snowflake Role",
     description="Snowflake role to use",
-    kind=SettingKind.STRING,
+    kind=SettingKind.STRING,  # ty: ignore[invalid-argument-type]
     env_specific=True,
 )
 
@@ -186,9 +186,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
                 f"""
                 CREATE TABLE IF NOT EXISTS {self.database}.{self.schema}.{self.table_name} (
                     state_id VARCHAR PRIMARY KEY,
-                    partial_state VARIANT,
-                    completed_state VARIANT,
-                    updated_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+                    state VARIANT
                 )
                 """,
             )
@@ -211,26 +209,19 @@ class SnowflakeStateStoreManager(StateStoreManager):
             state: the state to set.
 
         """
-        partial_json = json.dumps(state.partial_state) if state.partial_state else None
-        completed_json = json.dumps(state.completed_state) if state.completed_state else None
-
         with self.connection.cursor() as cursor:
             cursor.execute(
                 f"""
                 MERGE INTO {self.database}.{self.schema}.{self.table_name} AS target
-                USING (SELECT %s AS state_id, PARSE_JSON(%s) AS partial_state,
-                       PARSE_JSON(%s) AS completed_state) AS source
+                USING (SELECT %s AS state_id, PARSE_JSON(%s) AS state) AS source
                 ON target.state_id = source.state_id
                 WHEN MATCHED THEN
-                    UPDATE SET
-                        partial_state = source.partial_state,
-                        completed_state = source.completed_state,
-                        updated_at = CURRENT_TIMESTAMP()
+                    UPDATE SET state = source.state
                 WHEN NOT MATCHED THEN
-                    INSERT (state_id, partial_state, completed_state)
-                    VALUES (source.state_id, source.partial_state, source.completed_state)
+                    INSERT (state_id, state)
+                    VALUES (source.state_id, source.state)
                 """,  # noqa: S608
-                (state.state_id, partial_json, completed_json),
+                (state.state_id, state.json()),
             )
 
     def get(self, state_id: str) -> MeltanoState | None:
@@ -246,7 +237,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
         with self.connection.cursor() as cursor:
             cursor.execute(
                 f"""
-                SELECT partial_state, completed_state
+                SELECT state
                 FROM {self.database}.{self.schema}.{self.table_name}
                 WHERE state_id = %s
                 """,  # noqa: S608
@@ -257,30 +248,16 @@ class SnowflakeStateStoreManager(StateStoreManager):
             if not row:
                 return None
 
-            # Snowflake returns None for NULL VARIANT columns
-            # but MeltanoState expects empty dicts
-            # Additionally, VARIANT columns might return JSON strings that need parsing
-            partial_state = row[0]
-            completed_state = row[1]
+            state = row[0]
 
-            # Handle None values
-            if partial_state is None:
-                partial_state = {}
-            # Parse JSON string if Snowflake returns string instead of dict
-            elif isinstance(partial_state, str):
-                partial_state = json.loads(partial_state)
+            if state is None:
+                return MeltanoState(state_id=state_id)
 
-            if completed_state is None:
-                completed_state = {}
-            # Parse JSON string if Snowflake returns string instead of dict
-            elif isinstance(completed_state, str):
-                completed_state = json.loads(completed_state)
+            # VARIANT columns may come back as a dict or a JSON string
+            if isinstance(state, dict):
+                state = json.dumps(state)
 
-            return MeltanoState(
-                state_id=state_id,
-                partial_state=partial_state,
-                completed_state=completed_state,
-            )
+            return MeltanoState.from_json(state_id, state)
 
     def delete(self, state_id: str) -> None:
         """Delete state for the given state_id.

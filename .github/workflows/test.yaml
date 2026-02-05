@@ -10,7 +10,6 @@ on:
       - uv.lock
       - .github/workflows/test.yaml
   pull_request:
-    branches: [main]
     paths:
       - src/**
       - tests/**
@@ -34,10 +33,10 @@ jobs:
     name: Typing
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
-      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         id: setup-python
-      - uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
+      - uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41 # v7.2.1
       - env:
           UV_PYTHON: ${{ steps.setup-python.outputs.python-version }}
         run: >
@@ -47,9 +46,8 @@ jobs:
           tox -e types
 
   test:
-    name: Pytest (Python ${{ matrix.python-version }}, ${{ matrix.os }})
+    name: Test
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.python-version == '3.13' }}
     strategy:
       fail-fast: false
       matrix:
@@ -59,27 +57,28 @@ jobs:
           - "3.11"
           - "3.12"
           - "3.13"
+          - "3.14"
         include:
-          - python-version: "3.13"
+          - python-version: "3.14"
             os: "windows-latest"
 
-          - python-version: "3.13"
+          - python-version: "3.14"
             os: "macos-latest"
 
     steps:
-      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
-      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         id: setup-python
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
-      - uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
+      - uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41 # v7.2.1
       - run: >
           uvx
           --with tox-uv
           --with tox
           tox -e ${{ matrix.python-version }}
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           include-hidden-files: true
           name: coverage-data-${{ matrix.os }}-py${{ matrix.python-version }}
@@ -90,13 +89,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     steps:
-      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
-      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
-      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           pattern: coverage-data-*
           merge-multiple: true
-      - uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
+      - uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41 # v7.2.1
       - name: Combine coverage data and generate report
         run: >
           uvx

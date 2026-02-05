@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import shutil
 from decimal import Decimal
 from typing import TYPE_CHECKING
@@ -138,11 +137,7 @@ def test_set_state(
     mock_cursor.execute.assert_called()
     call_args = mock_cursor.execute.call_args
     assert "MERGE INTO testdb.testschema.meltano_state" in call_args[0][0]
-    assert call_args[0][1] == (
-        "test_job",
-        json.dumps({"singer_state": {"partial": 1}}),
-        json.dumps({"singer_state": {"complete": 1}}),
-    )
+    assert call_args[0][1] == ("test_job", state.json())
 
 
 def test_get_state(
@@ -153,8 +148,10 @@ def test_get_state(
 
     # Mock cursor response - Snowflake VARIANT columns return Python dicts
     mock_cursor.fetchone.return_value = (
-        {"singer_state": {"partial": 1}},
-        {"singer_state": {"complete": 1}},
+        {
+            "completed": {"singer_state": {"complete": 1}},
+            "partial": {"singer_state": {"partial": 1}},
+        },
     )
 
     # Get state
@@ -173,16 +170,15 @@ def test_get_state(
     assert state.completed_state == {"singer_state": {"complete": 1}}
 
 
-def test_get_state_with_json_strings(
+def test_get_state_with_json_string(
     subject: tuple[SnowflakeStateStoreManager, mock.Mock],
 ) -> None:
-    """Test getting state when Snowflake returns JSON strings."""
+    """Test getting state when Snowflake returns a JSON string."""
     manager, mock_cursor = subject
 
-    # Mock cursor response with JSON strings (as Snowflake might return)
+    # Mock cursor response with a JSON string (as Snowflake might return)
     mock_cursor.fetchone.return_value = (
-        '{"singer_state": {"partial": 1}}',
-        '{"singer_state": {"complete": 1}}',
+        '{"completed": {"singer_state": {"complete": 1}}, "partial": {"singer_state": {"partial": 1}}}',  # noqa: E501
     )
 
     # Get state
@@ -195,17 +191,14 @@ def test_get_state_with_json_strings(
     assert state.completed_state == {"singer_state": {"complete": 1}}
 
 
-def test_get_state_with_null_values(
+def test_get_state_with_null_value(
     subject: tuple[SnowflakeStateStoreManager, mock.Mock],
 ) -> None:
-    """Test getting state with NULL VARIANT columns."""
+    """Test getting state with NULL VARIANT column."""
     manager, mock_cursor = subject
 
-    # Mock cursor response with None values
-    mock_cursor.fetchone.return_value = (
-        None,
-        '{"singer_state": {"complete": 1}}',
-    )
+    # Mock cursor response with None value
+    mock_cursor.fetchone.return_value = (None,)
 
     # Get state
     state = manager.get("test_job")
@@ -213,8 +206,8 @@ def test_get_state_with_null_values(
 
     # Verify returned state handles None correctly
     assert state.state_id == "test_job"
-    assert state.partial_state == {}
-    assert state.completed_state == {"singer_state": {"complete": 1}}
+    assert state.partial_state is None
+    assert state.completed_state is None
 
 
 def test_get_state_not_found(
@@ -231,25 +224,6 @@ def test_get_state_not_found(
 
     # Verify it returns None
     assert state is None
-
-
-def test_get_state_with_none_values(
-    subject: tuple[SnowflakeStateStoreManager, mock.Mock],
-) -> None:
-    """Test getting state with None values (NULL in Snowflake)."""
-    manager, mock_cursor = subject
-
-    # Mock cursor response with None values
-    mock_cursor.fetchone.return_value = (None, None)
-
-    # Get state
-    state = manager.get("test_job")
-    assert state is not None
-
-    # Verify returned state has empty dicts for None values
-    assert state.state_id == "test_job"
-    assert state.partial_state == {}
-    assert state.completed_state == {}
 
 
 def test_delete_state(
