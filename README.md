@@ -1,9 +1,12 @@
 # `meltano-state-backend-snowflake`
 
-[![PyPI version](https://img.shields.io/pypi/v/meltano-state-backend-snowflake.svg?logo=pypi&logoColor=FFE873&color=blue)](https://pypi.org/project/meltano-state-backend-snowflake)
-[![Python versions](https://img.shields.io/pypi/pyversions/meltano-state-backend-snowflake.svg?logo=python&logoColor=FFE873)](https://pypi.org/project/meltano-state-backend-snowflake)
+<!-- Display these if and when we publish to PyPI. -->
 
-This is a [Meltano][meltano] extension that provides a [Snowflake][snowflake] [state backend][state-backend].
+<!--
+[![PyPI version](https://img.shields.io/pypi/v/meltano-state-backend-snowflake.svg?logo=pypi&logoColor=FFE873&color=blue)](https://pypi.org/project/meltano-state-backend-snowflake)
+[![Python versions](https://img.shields.io/pypi/pyversions/meltano-state-backend-snowflake.svg?logo=python&logoColor=FFE873)](https://pypi.org/project/meltano-state-backend-snowflake) -->
+
+This is a [Meltano] extension that provides a [Snowflake] [state backend][state-backend].
 
 ## Installation
 
@@ -14,14 +17,14 @@ This package needs to be installed in the same Python environment as Meltano.
 #### With [uv]
 
 ```bash
-uv tool install --with meltano-state-backend-snowflake meltano
+uv tool install --with git+https://github.com/meltano/meltano-state-backend-snowflake.git meltano
 ```
 
 #### With [pipx]
 
 ```bash
 pipx install meltano
-pipx inject meltano 'meltano-state-backend-snowflake
+pipx inject meltano git+https://github.com/meltano/meltano-state-backend-snowflake.git
 ```
 
 ## Configuration
@@ -29,6 +32,7 @@ pipx inject meltano 'meltano-state-backend-snowflake
 To store state in Snowflake, set the `state_backend.uri` setting to `snowflake://<user>:<password>@<account>/<database>/<schema>`.
 
 State will be stored in two tables that Meltano will create automatically:
+
 - `meltano_state` - Stores the actual state data
 - `meltano_state_locks` - Manages concurrency locks
 
@@ -70,6 +74,7 @@ state_backend:
 #### Security Considerations
 
 When storing credentials:
+
 - Use environment variables for sensitive values in production
 - Consider using Snowflake key-pair authentication (future enhancement)
 - Ensure the user has CREATE TABLE, INSERT, UPDATE, DELETE, and SELECT privileges
@@ -78,8 +83,8 @@ Example using environment variables:
 
 ```bash
 export MELTANO_STATE_BACKEND_SNOWFLAKE_PASSWORD='my_secure_password'
-meltano config meltano set state_backend.uri 'snowflake://my_user@my_account/my_database'
-meltano config meltano set state_backend.snowflake.warehouse 'my_warehouse'
+meltano config set meltano state_backend.uri 'snowflake://my_user@my_account/my_database'
+meltano config set meltano state_backend.snowflake.warehouse 'my_warehouse'
 ```
 
 ## Development
@@ -100,12 +105,15 @@ uvx --with tox-uv tox run-parallel
 
 ### Bump the version
 
+Using the [GitHub CLI][gh]:
+
 ```bash
-uv version --bump <type>
+gh release create v<new-version>
 ```
 
+[gh]: https://cli.github.com/
 [meltano]: https://meltano.com
+[pipx]: https://github.com/pypa/pipx
 [snowflake]: https://www.snowflake.com/
 [state-backend]: https://docs.meltano.com/concepts/state_backends
-[pipx]: https://github.com/pypa/pipx
 [uv]: https://docs.astral.sh/uv
