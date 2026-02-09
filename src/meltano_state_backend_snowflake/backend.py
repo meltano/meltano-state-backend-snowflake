@@ -7,7 +7,7 @@ import typing as t
 from contextlib import contextmanager
 from functools import cached_property
 from time import sleep
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 import snowflake.connector
 from meltano.core.error import MeltanoError
@@ -123,6 +123,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
         super().__init__(**kwargs)
         self.uri = uri
         parsed = urlparse(uri)
+        query_params = parse_qs(parsed.query)
 
         # Extract connection details from URI and parameters
         self.account = account or parsed.hostname
@@ -140,7 +141,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
             msg = "Snowflake password is required"
             raise MissingStateBackendSettingsError(msg)
 
-        self.warehouse = warehouse
+        self.warehouse = warehouse or query_params.get("warehouse", [None])[0]
         if not self.warehouse:
             msg = "Snowflake warehouse is required"
             raise MissingStateBackendSettingsError(msg)
@@ -153,7 +154,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
             raise MissingStateBackendSettingsError(msg)
 
         self.schema = schema or (path_parts[1] if len(path_parts) > 1 else "PUBLIC")
-        self.role = role
+        self.role = role or query_params.get("role", [None])[0]
 
         self._ensure_tables()
 

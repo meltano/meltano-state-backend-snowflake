@@ -29,14 +29,27 @@ pipx inject meltano git+https://github.com/meltano/meltano-state-backend-snowfla
 
 ## Configuration
 
-To store state in Snowflake, set the `state_backend.uri` setting to `snowflake://<user>:<password>@<account>/<database>/<schema>`.
+To store state in Snowflake, set the `state_backend.uri` setting to a [Snowflake SQLAlchemy][snowflake-sqlalchemy]-style URI:
+
+```
+snowflake://<user>:<password>@<account>/<database>/<schema>?warehouse=<warehouse>&role=<role>
+```
 
 State will be stored in two tables that Meltano will create automatically:
 
 - `meltano_state` - Stores the actual state data
 - `meltano_state_locks` - Manages concurrency locks
 
-To authenticate to Snowflake, you'll need to provide:
+All connection parameters can be provided in the URI (including as query parameters), as individual Meltano settings, or a mix of both. Explicit settings take precedence over URI values.
+
+Using a single URI with query parameters:
+
+```yaml
+state_backend:
+  uri: snowflake://my_user:my_password@my_account/my_database/my_schema?warehouse=my_warehouse&role=my_role
+```
+
+Using a URI with separate settings for warehouse and role:
 
 ```yaml
 state_backend:
@@ -46,11 +59,11 @@ state_backend:
     role: my_role           # Optional: The role to use for the connection
 ```
 
-Alternatively, you can provide credentials via individual settings:
+Using individual settings for everything:
 
 ```yaml
 state_backend:
-  uri: snowflake://my_account/my_database/my_schema
+  uri: snowflake://my_account
   snowflake:
     account: my_account
     user: my_user
@@ -83,9 +96,10 @@ Example using environment variables:
 
 ```bash
 export MELTANO_STATE_BACKEND_SNOWFLAKE_PASSWORD='my_secure_password'
-meltano config set meltano state_backend.uri 'snowflake://my_user@my_account/my_database'
-meltano config set meltano state_backend.snowflake.warehouse 'my_warehouse'
+meltano config set meltano state_backend.uri 'snowflake://my_user@my_account/my_database?warehouse=my_warehouse'
 ```
+
+Passwords containing special characters (e.g. `@`, `%`) must be URL-encoded when included in the URI. For example, `p@ss` becomes `p%40ss`.
 
 ## Development
 
@@ -115,5 +129,6 @@ gh release create v<new-version>
 [meltano]: https://meltano.com
 [pipx]: https://github.com/pypa/pipx
 [snowflake]: https://www.snowflake.com/
+[snowflake-sqlalchemy]: https://github.com/snowflakedb/snowflake-sqlalchemy
 [state-backend]: https://docs.meltano.com/concepts/state_backends
 [uv]: https://docs.astral.sh/uv
