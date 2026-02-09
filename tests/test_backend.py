@@ -379,6 +379,66 @@ def test_acquire_lock_retry(
     assert mock_cursor.execute.call_count >= 2
 
 
+@pytest.mark.usefixtures("mock_connection")
+class TestURIQueryParams:
+    """Tests for URI query parameter parsing."""
+
+    def test_full_sqlalchemy_uri(self) -> None:
+        """Test full SQLAlchemy-style URI with all params."""
+        manager = SnowflakeStateStoreManager(
+            uri="snowflake://myuser:mypass@myaccount/mydb/myschema?warehouse=mywh&role=myrole",
+        )
+        assert manager.account == "myaccount"
+        assert manager.user == "myuser"
+        assert manager.password == "mypass"  # noqa: S105
+        assert manager.database == "mydb"
+        assert manager.schema == "myschema"
+        assert manager.warehouse == "mywh"
+        assert manager.role == "myrole"
+
+    def test_warehouse_from_query_param(self) -> None:
+        """Test warehouse extracted from query parameter."""
+        manager = SnowflakeStateStoreManager(
+            uri="snowflake://myuser:mypass@myaccount/mydb?warehouse=mywh",
+        )
+        assert manager.warehouse == "mywh"
+        assert manager.schema == "PUBLIC"
+
+    def test_role_from_query_param(self) -> None:
+        """Test role extracted from query parameter."""
+        manager = SnowflakeStateStoreManager(
+            uri="snowflake://myuser:mypass@myaccount/mydb?warehouse=mywh&role=analyst",
+        )
+        assert manager.role == "analyst"
+
+    def test_explicit_settings_override_query_params(self) -> None:
+        """Test that explicit settings take precedence over query params."""
+        manager = SnowflakeStateStoreManager(
+            uri="snowflake://uri_user:uri_pass@uri_account/uri_db/uri_schema?warehouse=uri_wh&role=uri_role",
+            account="explicit_account",
+            user="explicit_user",
+            password="explicit_pass",  # noqa: S106
+            warehouse="explicit_wh",
+            database="explicit_db",
+            schema="explicit_schema",
+            role="explicit_role",
+        )
+        assert manager.account == "explicit_account"
+        assert manager.user == "explicit_user"
+        assert manager.password == "explicit_pass"  # noqa: S105
+        assert manager.warehouse == "explicit_wh"
+        assert manager.database == "explicit_db"
+        assert manager.schema == "explicit_schema"
+        assert manager.role == "explicit_role"
+
+    def test_role_defaults_to_none(self) -> None:
+        """Test role defaults to None when not provided."""
+        manager = SnowflakeStateStoreManager(
+            uri="snowflake://myuser:mypass@myaccount/mydb?warehouse=mywh",
+        )
+        assert manager.role is None
+
+
 def test_missing_account_validation() -> None:
     """Test missing account validation."""
     with pytest.raises(
