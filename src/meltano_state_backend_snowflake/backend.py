@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import typing as t
 from contextlib import contextmanager
@@ -85,6 +86,15 @@ SNOWFLAKE_ROLE = SettingDefinition(
     env_specific=True,
 )
 
+SNOWFLAKE_PRIVATE_KEY_BASE64 = SettingDefinition(
+    name="state_backend.snowflake.private_key_base64",
+    label="Snowflake Private Key (Base64-encoded DER)",
+    description="Snowflake private key to use, in base64-encoded DER format",
+    kind=SettingKind.STRING,  # ty: ignore[invalid-argument-type]
+    sensitive=True,
+    env_specific=True,
+)
+
 
 class SnowflakeStateStoreManager(StateStoreManager):
     """State backend for Snowflake."""
@@ -104,6 +114,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
         database: str | None = None,
         schema: str | None = None,
         role: str | None = None,
+        private_key_base64: str | None = None,
         **kwargs: t.Any,
     ) -> None:
         """Initialize the SnowflakeStateStoreManager.
@@ -117,6 +128,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
             database: Snowflake database name
             schema: Snowflake schema name (default: PUBLIC)
             role: Optional Snowflake role to use
+            private_key_base64: Optional Snowflake private key to use, in base64-encoded DER format
             kwargs: Additional keyword args to pass to parent
 
         """
@@ -137,8 +149,8 @@ class SnowflakeStateStoreManager(StateStoreManager):
             raise MissingStateBackendSettingsError(msg)
 
         self.password = password or parsed.password
-        if not self.password:
-            msg = "Snowflake password is required"
+        if not self.password and not private_key_base64 and not query_params.get("private_key_base64"):
+            msg = "Snowflake password or private key is required"
             raise MissingStateBackendSettingsError(msg)
 
         self.warehouse = warehouse or query_params.get("warehouse", [None])[0]
@@ -156,7 +168,17 @@ class SnowflakeStateStoreManager(StateStoreManager):
         self.schema = schema or (path_parts[1] if len(path_parts) > 1 else "PUBLIC")
         self.role = role or query_params.get("role", [None])[0]
 
+        pkey_base64 = private_key_base64 or query_params.get("private_key_base64", [None])[0]
+        self.private_key = self._load_private_key(pkey_base64) if pkey_base64 else None
+
         self._ensure_tables()
+
+    def _load_private_key(self, pkey_base64: str) -> bytes:
+        # Restore '+' chars that parse_qs decodes as spaces
+        pkey_base64 = pkey_base64.replace(" ", "+")
+        # Add padding if stripped (e.g. from URL query params)
+        pkey_base64 += "=" * (-len(pkey_base64) % 4)
+        return base64.b64decode(pkey_base64)
 
     @cached_property
     def connection(self) -> snowflake.connector.SnowflakeConnection:
@@ -169,13 +191,17 @@ class SnowflakeStateStoreManager(StateStoreManager):
         conn_params = {
             "account": self.account,
             "user": self.user,
-            "password": self.password,
             "warehouse": self.warehouse,
             "database": self.database,
             "schema": self.schema,
         }
         if self.role:
             conn_params["role"] = self.role
+
+        if self.private_key:
+            conn_params["private_key"] = self.private_key
+        elif self.password:
+            conn_params["password"] = self.password
 
         return snowflake.connector.connect(**conn_params)
 

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import base64
 import shutil
 from decimal import Decimal
 from typing import TYPE_CHECKING
 from unittest import mock
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from meltano.core.project import Project
 from meltano.core.state_store import MeltanoState, state_store_manager_from_project_settings
 from meltano.core.state_store.base import (
@@ -29,6 +32,17 @@ def project(tmp_path: Path) -> Project:
         ignore=shutil.ignore_patterns(".meltano/**"),
     )
     return Project.find(path.resolve())  # type: ignore[no-any-return]
+
+
+@pytest.fixture
+def pkey_base64() -> str:
+    dummy_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    dummy_private_key = dummy_key.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    return base64.b64encode(dummy_private_key).decode("utf-8")
 
 
 def test_get_manager(project: Project) -> None:
@@ -379,64 +393,78 @@ def test_acquire_lock_retry(
     assert mock_cursor.execute.call_count >= 2
 
 
+# class TestURIQueryParams:
+#     """Tests for URI query parameter parsing."""
+
+
+@pytest.fixture
+def base_uri() -> str:
+    return "snowflake://myuser:mypass@myaccount/mydb/myschema?warehouse=mywh"
+
+
 @pytest.mark.usefixtures("mock_connection")
-class TestURIQueryParams:
-    """Tests for URI query parameter parsing."""
+def test_full_sqlalchemy_uri(base_uri: str) -> None:
+    """Test full SQLAlchemy-style URI with all params."""
+    manager = SnowflakeStateStoreManager(uri=f"{base_uri}&role=myrole")
+    assert manager.account == "myaccount"
+    assert manager.user == "myuser"
+    assert manager.password == "mypass"  # noqa: S105
+    assert manager.database == "mydb"
+    assert manager.schema == "myschema"
+    assert manager.warehouse == "mywh"
+    assert manager.role == "myrole"
 
-    def test_full_sqlalchemy_uri(self) -> None:
-        """Test full SQLAlchemy-style URI with all params."""
-        manager = SnowflakeStateStoreManager(
-            uri="snowflake://myuser:mypass@myaccount/mydb/myschema?warehouse=mywh&role=myrole",
-        )
-        assert manager.account == "myaccount"
-        assert manager.user == "myuser"
-        assert manager.password == "mypass"  # noqa: S105
-        assert manager.database == "mydb"
-        assert manager.schema == "myschema"
-        assert manager.warehouse == "mywh"
-        assert manager.role == "myrole"
 
-    def test_warehouse_from_query_param(self) -> None:
-        """Test warehouse extracted from query parameter."""
-        manager = SnowflakeStateStoreManager(
-            uri="snowflake://myuser:mypass@myaccount/mydb?warehouse=mywh",
-        )
-        assert manager.warehouse == "mywh"
-        assert manager.schema == "PUBLIC"
+@pytest.mark.usefixtures("mock_connection")
+def test_warehouse_from_query_param(base_uri: str) -> None:
+    """Test warehouse extracted from query parameter."""
+    manager = SnowflakeStateStoreManager(uri=base_uri)
+    assert manager.warehouse == "mywh"
+    assert manager.schema == "myschema"
 
-    def test_role_from_query_param(self) -> None:
-        """Test role extracted from query parameter."""
-        manager = SnowflakeStateStoreManager(
-            uri="snowflake://myuser:mypass@myaccount/mydb?warehouse=mywh&role=analyst",
-        )
-        assert manager.role == "analyst"
 
-    def test_explicit_settings_override_query_params(self) -> None:
-        """Test that explicit settings take precedence over query params."""
-        manager = SnowflakeStateStoreManager(
-            uri="snowflake://uri_user:uri_pass@uri_account/uri_db/uri_schema?warehouse=uri_wh&role=uri_role",
-            account="explicit_account",
-            user="explicit_user",
-            password="explicit_pass",  # noqa: S106
-            warehouse="explicit_wh",
-            database="explicit_db",
-            schema="explicit_schema",
-            role="explicit_role",
-        )
-        assert manager.account == "explicit_account"
-        assert manager.user == "explicit_user"
-        assert manager.password == "explicit_pass"  # noqa: S105
-        assert manager.warehouse == "explicit_wh"
-        assert manager.database == "explicit_db"
-        assert manager.schema == "explicit_schema"
-        assert manager.role == "explicit_role"
+@pytest.mark.usefixtures("mock_connection")
+def test_role_from_query_param(base_uri: str) -> None:
+    """Test role extracted from query parameter."""
+    manager = SnowflakeStateStoreManager(uri=f"{base_uri}&role=analyst")
+    assert manager.role == "analyst"
 
-    def test_role_defaults_to_none(self) -> None:
-        """Test role defaults to None when not provided."""
-        manager = SnowflakeStateStoreManager(
-            uri="snowflake://myuser:mypass@myaccount/mydb?warehouse=mywh",
-        )
-        assert manager.role is None
+
+@pytest.mark.usefixtures("mock_connection")
+def test_explicit_settings_override_query_params(base_uri: str) -> None:
+    """Test that explicit settings take precedence over query params."""
+    manager = SnowflakeStateStoreManager(
+        uri=f"{base_uri}&role=uri_role",
+        account="explicit_account",
+        user="explicit_user",
+        password="explicit_pass",  # noqa: S106
+        warehouse="explicit_wh",
+        database="explicit_db",
+        schema="explicit_schema",
+        role="explicit_role",
+    )
+    assert manager.account == "explicit_account"
+    assert manager.user == "explicit_user"
+    assert manager.password == "explicit_pass"  # noqa: S105
+    assert manager.warehouse == "explicit_wh"
+    assert manager.database == "explicit_db"
+    assert manager.schema == "explicit_schema"
+    assert manager.role == "explicit_role"
+
+
+@pytest.mark.usefixtures("mock_connection")
+def test_role_defaults_to_none(base_uri: str) -> None:
+    """Test role defaults to None when not provided."""
+    manager = SnowflakeStateStoreManager(uri=base_uri)
+    assert manager.role is None
+
+
+@pytest.mark.usefixtures("mock_connection")
+def test_private_key_from_query_param(base_uri: str, pkey_base64: str) -> None:
+    """Test private key extracted from query parameter."""
+    manager = SnowflakeStateStoreManager(uri=f"{base_uri}&private_key_base64={pkey_base64}")
+    assert manager.private_key is not None
+    assert manager.private_key == base64.b64decode(pkey_base64)
 
 
 def test_missing_account_validation() -> None:
@@ -470,10 +498,10 @@ def test_missing_user_validation() -> None:
 
 
 def test_missing_password_validation() -> None:
-    """Test missing password validation."""
+    """Test missing password validation when no private key is provided."""
     with pytest.raises(
         MissingStateBackendSettingsError,
-        match="Snowflake password is required",
+        match="Snowflake password or private key is required",
     ):
         SnowflakeStateStoreManager(
             uri="snowflake://user@account/db",  # No password in URI
@@ -482,6 +510,17 @@ def test_missing_password_validation() -> None:
             warehouse="warehouse",
             database="db",
         )
+
+
+@pytest.mark.usefixtures("mock_connection")
+def test_private_key_without_password(pkey_base64: str) -> None:
+    """Test that private key auth works without a password."""
+    manager = SnowflakeStateStoreManager(
+        uri="snowflake://myuser@myaccount/mydb?warehouse=mywh",
+        private_key_base64=pkey_base64,
+    )
+    assert manager.private_key == base64.b64decode(pkey_base64)
+    assert manager.password is None
 
 
 def test_missing_warehouse_validation() -> None:
