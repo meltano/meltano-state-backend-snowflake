@@ -883,6 +883,7 @@ wheels = [
 name = "meltano-state-backend-snowflake"
 source = { editable = "." }
 dependencies = [
+    { name = "cryptography" },
     { name = "meltano" },
     { name = "snowflake-connector-python" },
 ]
@@ -911,6 +912,7 @@ types = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography", specifier = ">=42" },
     { name = "meltano", specifier = ">=3.7" },
     { name = "snowflake-connector-python", specifier = ">=4,<5" },
 ]

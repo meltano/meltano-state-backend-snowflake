@@ -178,11 +178,21 @@ class SnowflakeStateStoreManager(StateStoreManager):
         self._ensure_tables()
 
     def _load_private_key(self, pkey_base64: str) -> bytes:
-        # Restore '+' chars that parse_qs decodes as spaces
-        pkey_base64 = pkey_base64.replace(" ", "+")
-        # Add padding if stripped (e.g. from URL query params)
-        pkey_base64 += "=" * (-len(pkey_base64) % 4)
-        return base64.b64decode(pkey_base64)
+        from cryptography.hazmat.primitives.serialization import (
+            Encoding,
+            NoEncryption,
+            PrivateFormat,
+            load_pem_private_key,
+        )
+
+        # We assume the value is a PEM private key
+        private_key = load_pem_private_key(base64.b64decode(pkey_base64), password=None)
+
+        return private_key.private_bytes(
+            encoding=Encoding.DER,
+            format=PrivateFormat.PKCS8,
+            encryption_algorithm=NoEncryption(),
+        )
 
     @cached_property
     def connection(self) -> snowflake.connector.SnowflakeConnection:

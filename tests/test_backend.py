@@ -37,12 +37,12 @@ def project(tmp_path: Path) -> Project:
 @pytest.fixture
 def pkey_base64() -> str:
     dummy_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    dummy_private_key = dummy_key.private_bytes(
-        encoding=serialization.Encoding.DER,
+    dummy_pem = dummy_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     )
-    return base64.b64encode(dummy_private_key).decode("utf-8")
+    return base64.b64encode(dummy_pem).decode("utf-8")
 
 
 def test_get_manager(project: Project) -> None:
@@ -464,7 +464,14 @@ def test_private_key_from_query_param(base_uri: str, pkey_base64: str) -> None:
     """Test private key extracted from query parameter."""
     manager = SnowflakeStateStoreManager(uri=f"{base_uri}&private_key_base64={pkey_base64}")
     assert manager.private_key is not None
-    assert manager.private_key == base64.b64decode(pkey_base64)
+    # _load_private_key re-serializes to DER PKCS8
+    pem_key = serialization.load_pem_private_key(base64.b64decode(pkey_base64), password=None)
+    expected_der = pem_key.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    assert manager.private_key == expected_der
 
 
 def test_missing_account_validation() -> None:
@@ -519,7 +526,14 @@ def test_private_key_without_password(pkey_base64: str) -> None:
         uri="snowflake://myuser@myaccount/mydb?warehouse=mywh",
         private_key_base64=pkey_base64,
     )
-    assert manager.private_key == base64.b64decode(pkey_base64)
+    # _load_private_key re-serializes to DER PKCS8
+    pem_key = serialization.load_pem_private_key(base64.b64decode(pkey_base64), password=None)
+    expected_der = pem_key.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    assert manager.private_key == expected_der
     assert manager.password is None
 
 
