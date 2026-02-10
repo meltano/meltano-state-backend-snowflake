@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import base64
 import json
-import typing as t
 from contextlib import contextmanager
 from functools import cached_property
 from time import sleep
+from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, urlparse
 
 import snowflake.connector
@@ -20,7 +20,7 @@ from meltano.core.state_store.base import (
     StateStoreManager,
 )
 
-if t.TYPE_CHECKING:
+if TYPE_CHECKING:
     from collections.abc import Generator, Iterable
 
 
@@ -115,7 +115,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
         schema: str | None = None,
         role: str | None = None,
         private_key_base64: str | None = None,
-        **kwargs: t.Any,
+        **kwargs: Any,
     ) -> None:
         """Initialize the SnowflakeStateStoreManager.
 
@@ -192,7 +192,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
             A Snowflake connection object.
 
         """
-        conn_params = {
+        conn_params: dict[str, Any] = {
             "account": self.account,
             "user": self.user,
             "warehouse": self.warehouse,
