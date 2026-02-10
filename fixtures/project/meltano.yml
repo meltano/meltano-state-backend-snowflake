@@ -1,4 +1,4 @@
-version: 1
+requires_meltano: ">=3.7"
 default_environment: dev
 project_id: 1ec76bd8-4499-4bad-a974-b27225d75f12
 send_anonymous_usage_stats: false
