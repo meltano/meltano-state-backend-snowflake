@@ -78,18 +78,49 @@ state_backend:
 
 - **account**: Your Snowflake account identifier (e.g., `myorg-account123`)
 - **user**: The username for authentication
-- **password**: The password for authentication
+- **password**: The password for authentication (required unless using key pair authentication)
 - **warehouse**: The compute warehouse to use (required)
 - **database**: The database where state will be stored
 - **schema**: The schema where state tables will be created (defaults to PUBLIC)
 - **role**: Optional role to use for the connection
+- **private_key_base64**: Optional base64-encoded DER private key for key pair authentication
+
+#### Key Pair Authentication
+
+Instead of password-based authentication, you can use [Snowflake key pair authentication][snowflake-keypair]. Provide the private key as a base64-encoded DER-format string:
+
+```yaml
+state_backend:
+  uri: snowflake://my_user@my_account/my_database?warehouse=my_warehouse
+  snowflake:
+    private_key_base64: MIIEvgIBADANBg...  # base64-encoded DER private key
+```
+
+The private key can also be passed as a URI query parameter:
+
+```
+snowflake://my_user@my_account/my_database?warehouse=my_warehouse&private_key_base64=MIIEvgIBADANBg...
+```
+
+Or via an environment variable:
+
+```bash
+export MELTANO_STATE_BACKEND_SNOWFLAKE_PRIVATE_KEY_BASE64='MIIEvgIBADANBg...'
+```
+
+To generate the base64-encoded DER key from a PEM private key file:
+
+```bash
+openssl pkcs8 -topk8 -inform PEM -outform DER -in rsa_key.pem -nocrypt | base64
+```
+
+When using key pair authentication, no password is required.
 
 #### Security Considerations
 
 When storing credentials:
 
 - Use environment variables for sensitive values in production
-- Consider using Snowflake key-pair authentication (future enhancement)
 - Ensure the user has CREATE TABLE, INSERT, UPDATE, DELETE, and SELECT privileges
 
 Example using environment variables:
@@ -129,6 +160,7 @@ gh release create v<new-version>
 [meltano]: https://meltano.com
 [pipx]: https://github.com/pypa/pipx
 [snowflake]: https://www.snowflake.com/
+[snowflake-keypair]: https://docs.snowflake.com/en/user-guide/key-pair-auth
 [snowflake-sqlalchemy]: https://github.com/snowflakedb/snowflake-sqlalchemy
 [state-backend]: https://docs.meltano.com/concepts/state_backends
 [uv]: https://docs.astral.sh/uv
