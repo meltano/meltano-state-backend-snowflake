@@ -149,7 +149,11 @@ class SnowflakeStateStoreManager(StateStoreManager):
             raise MissingStateBackendSettingsError(msg)
 
         self.password = password or parsed.password
-        if not self.password and not private_key_base64 and not query_params.get("private_key_base64"):
+        if (
+            not self.password
+            and not private_key_base64
+            and not query_params.get("private_key_base64")
+        ):
             msg = "Snowflake password or private key is required"
             raise MissingStateBackendSettingsError(msg)
 
