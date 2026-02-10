@@ -204,7 +204,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
 
         if self.private_key:
             conn_params["private_key"] = self.private_key
-        elif self.password:
+        elif self.password:  # pragma: no branch
             conn_params["password"] = self.password
 
         return snowflake.connector.connect(**conn_params)
