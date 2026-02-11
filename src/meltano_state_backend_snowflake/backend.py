@@ -74,7 +74,6 @@ SNOWFLAKE_SCHEMA = SettingDefinition(
     label="Snowflake Schema",
     description="Snowflake schema name",
     kind=SettingKind.STRING,  # ty: ignore[invalid-argument-type]
-    value="PUBLIC",
     env_specific=True,
 )
 

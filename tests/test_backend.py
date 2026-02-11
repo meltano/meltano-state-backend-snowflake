@@ -5,6 +5,7 @@ import shutil
 from decimal import Decimal
 from typing import TYPE_CHECKING
 from unittest import mock
+from urllib.parse import urlparse
 
 import pytest
 from cryptography.hazmat.primitives import serialization
@@ -27,11 +28,22 @@ if TYPE_CHECKING:
 def project(tmp_path: Path) -> Project:
     path = tmp_path / "project"
     shutil.copytree(
-        "fixtures/project",
+        "fixtures/explicit",
         path,
         ignore=shutil.ignore_patterns(".meltano/**"),
     )
-    return Project.find(path.resolve())  # type: ignore[no-any-return]
+    return Project(path.resolve())
+
+
+@pytest.fixture
+def project_with_uri(tmp_path: Path) -> Project:
+    path = tmp_path / "project"
+    shutil.copytree(
+        "fixtures/only_uri",
+        path,
+        ignore=shutil.ignore_patterns(".meltano/**"),
+    )
+    return Project(path.resolve())
 
 
 @pytest.fixture
@@ -53,13 +65,48 @@ def test_get_manager(project: Project) -> None:
 
     mock_ensure_tables.assert_called_once()
     assert isinstance(manager, SnowflakeStateStoreManager)
-    assert manager.uri == "snowflake://my-account"
+
+    parsed = urlparse(manager.uri)
+    assert parsed.scheme == "snowflake"
+    assert parsed.hostname == "my-account"
+
+    # Parameters are not included in the URI
+    assert not parsed.username
+    assert not parsed.password
+    assert not parsed.path
+    assert not parsed.query
+
+    # Parameters are passed explicitly to the manager
     assert manager.account == "my-account"
     assert manager.user == "test_user"
     assert manager.password == "test_password"  # noqa: S105
     assert manager.warehouse == "test_warehouse"
     assert manager.database == "test_database"
     assert manager.schema == "test_schema"
+    assert manager.role == "test_role"
+
+
+def test_get_manager_from_uri(project_with_uri: Project) -> None:
+    with mock.patch(
+        "meltano_state_backend_snowflake.backend.SnowflakeStateStoreManager._ensure_tables",
+    ) as mock_ensure_tables:
+        manager = state_store_manager_from_project_settings(project_with_uri.settings)
+
+    mock_ensure_tables.assert_called_once()
+    assert isinstance(manager, SnowflakeStateStoreManager)
+
+    parsed = urlparse(manager.uri)
+    assert parsed.scheme == "snowflake"
+    assert parsed.hostname == "my-account"
+
+    # Parameters are only included in the URI
+    assert parsed.username == manager.user == "test_user"
+    assert parsed.password == manager.password == "test_password"  # noqa: S105
+    assert parsed.path == "/test_database/test_schema"
+    assert manager.database == "test_database"
+    assert manager.schema == "test_schema"
+    assert parsed.query == "warehouse=test_warehouse&role=test_role"
+    assert manager.warehouse == "test_warehouse"
     assert manager.role == "test_role"
 
 
@@ -85,6 +132,11 @@ def test_get_manager(project: Project) -> None:
             "state_backend.snowflake.role",
             "MELTANO_STATE_BACKEND_SNOWFLAKE_ROLE",
             id="role",
+        ),
+        pytest.param(
+            "state_backend.snowflake.private_key_base64",
+            "MELTANO_STATE_BACKEND_SNOWFLAKE_PRIVATE_KEY_BASE64",
+            id="private_key_base64",
         ),
     ),
 )
@@ -391,10 +443,6 @@ def test_acquire_lock_retry(
 
     # Verify it retried
     assert mock_cursor.execute.call_count >= 2
-
-
-# class TestURIQueryParams:
-#     """Tests for URI query parameter parsing."""
 
 
 @pytest.fixture

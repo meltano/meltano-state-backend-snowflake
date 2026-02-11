@@ -1,0 +1,8 @@
+requires_meltano: ">=3.7"
+default_environment: dev
+project_id: 1ec76bd8-4499-4bad-a974-b27225d75f12
+send_anonymous_usage_stats: false
+environments:
+- name: dev
+state_backend:
+  uri: snowflake://test_user:test_password@my-account/test_database/test_schema?warehouse=test_warehouse&role=test_role
