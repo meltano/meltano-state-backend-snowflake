@@ -323,11 +323,14 @@ class SnowflakeStateStoreManager(StateStoreManager):
             cursor.execute(
                 f"SELECT COUNT(*) FROM {self.database}.{self.schema}.{self.table_name}",  # noqa: S608
             )
-            count = cursor.fetchone()[0]  # type: ignore[index]
+            count = 0
+            if row := cursor.fetchone():
+                count = row[0]
+
             cursor.execute(
                 f"TRUNCATE TABLE {self.database}.{self.schema}.{self.table_name}",
             )
-            return count  # type: ignore[no-any-return]
+            return count
 
     def get_state_ids(self, pattern: str | None = None) -> Iterable[str]:
         """Get all state_ids available in this state store manager.
