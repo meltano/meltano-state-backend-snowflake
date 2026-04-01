@@ -174,31 +174,36 @@ exclude_also = [
 fail_under = 100
 
 [tool.tox]
-min_version = "4.22"
+min_version = "4.51"
 requires = [ "tox", "tox-uv" ]
 env_list = [
   "types",
   "lint",
-  "3.14",
-  "3.13",
-  "3.12",
-  "3.11",
-  "3.10",
+  { product = [
+    { prefix = "3.", start = 10 },
+  ] },
   "coverage",
 ]
 
 [tool.tox.env_run_base]
+description = "run tests with coverage measurement on Python {py_dot_ver}"
+base_python_file = [ ".python-version" ]
 runner = "uv-venv-lock-runner"
 dependency_groups = [ "tests" ]
-commands = [ [ "coverage", "run", "-m", "pytest", { replace = "posargs", default = [ "tests" ], extend = true } ] ]
+commands = [
+  [
+    "coverage",
+    "run",
+    "-m",
+    "pytest",
+    { replace = "posargs", default = [ "tests" ], extend = true }
+  ]
+]
 
 [tool.tox.env.coverage]
+description = "combine and report coverage data"
 depends = [
-  "3.10",
-  "3.11",
-  "3.12",
-  "3.13",
-  "3.14",
+  "3.*",
 ]
 dependency_groups = [ "tests" ]
 commands = [
@@ -208,6 +213,7 @@ commands = [
 ]
 
 [tool.tox.env.lint]
+description = "lint and format code with Ruff"
 dependency_groups = [ "lint" ]
 skip_install = true
 commands = [
@@ -216,6 +222,7 @@ commands = [
 ]
 
 [tool.tox.env.types]
+description = "type check code with mypy and ty"
 dependency_groups = [ "tests", "types" ]
 commands = [
   [
