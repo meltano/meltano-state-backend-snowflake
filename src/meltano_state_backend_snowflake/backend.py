@@ -324,7 +324,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
                 f"SELECT COUNT(*) FROM {self.database}.{self.schema}.{self.table_name}",  # noqa: S608
             )
             count = 0
-            if row := cursor.fetchone():
+            if row := cursor.fetchone():  # pragma: no branch
                 count = row[0]
 
             cursor.execute(
