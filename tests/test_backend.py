@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import base64
 import shutil
-from decimal import Decimal
 from typing import TYPE_CHECKING
 from unittest import mock
 from urllib.parse import urlparse
@@ -437,12 +436,24 @@ def test_acquire_lock_retry(
     # Mock the ProgrammingError class used in the implementation
     with (
         mock.patch("snowflake.connector.errors.ProgrammingError", Exception),
-        manager.acquire_lock("test_job", retry_seconds=0.01),  # type: ignore[arg-type]  # ty:ignore[invalid-argument-type]
+        manager.acquire_lock("test_job", retry_seconds=0.01),
     ):
         pass
 
     # Verify it retried
     assert mock_cursor.execute.call_count >= 2
+
+
+@pytest.mark.usefixtures("mock_connection")
+def test_percent_encoded_credentials_in_uri() -> None:
+    """Test that percent-encoded credentials in the URI are correctly decoded."""
+    # p%40ss%21word decodes to p@ss!word
+    manager = SnowflakeStateStoreManager(
+        uri="snowflake://myuser:p%40ss%21word@my-account/mydb?warehouse=mywh",
+    )
+    assert manager.user == "myuser"
+    assert manager.password == "p@ss!word"  # noqa: S105
+    assert manager.account == "my-account"
 
 
 @pytest.fixture
@@ -667,7 +678,7 @@ def test_acquire_lock_max_retries_exceeded(
     # Mock lock conflict on all attempts
     mock_cursor.execute.side_effect = mock_programming_error
 
-    retry_seconds = Decimal("0.01")
+    retry_seconds = 0.01
 
     # Mock the ProgrammingError class used in the implementation
     with (  # noqa: SIM117
@@ -678,7 +689,7 @@ def test_acquire_lock_max_retries_exceeded(
             match="Could not acquire lock for state_id: test_job",
         ),
     ):
-        with manager.acquire_lock("test_job", retry_seconds=retry_seconds):  # type: ignore[arg-type]  # ty:ignore[invalid-argument-type]
+        with manager.acquire_lock("test_job", retry_seconds=retry_seconds):
             pass  # pragma: no cover
 
     assert mock_sleep.call_count == int(30 / retry_seconds) - 1
@@ -702,7 +713,7 @@ def test_acquire_lock_other_programming_error(
         pytest.raises(Exception, match="Some other error"),
         mock.patch("meltano_state_backend_snowflake.backend.sleep") as mock_sleep,
     ):
-        with manager.acquire_lock("test_job", retry_seconds=0.01):  # type: ignore[arg-type]  # ty:ignore[invalid-argument-type]
+        with manager.acquire_lock("test_job", retry_seconds=0.01):
             pass  # pragma: no cover
 
     mock_sleep.assert_not_called()
@@ -731,7 +742,7 @@ def test_acquire_lock_multiple_retries_then_success(
     with (
         mock.patch("snowflake.connector.errors.ProgrammingError", Exception),
         mock.patch("meltano_state_backend_snowflake.backend.sleep") as mock_sleep,
-        manager.acquire_lock("test_job", retry_seconds=0.01),  # type: ignore[arg-type]  # ty:ignore[invalid-argument-type]
+        manager.acquire_lock("test_job", retry_seconds=0.01),
     ):
         # Verify sleep was called 3 times (for the 3 failed attempts)
         assert mock_sleep.call_count == 3
