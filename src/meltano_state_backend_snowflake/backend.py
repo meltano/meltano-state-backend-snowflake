@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import base64
 import json
+import sys
 from contextlib import contextmanager
 from functools import cached_property
 from time import sleep
 from typing import TYPE_CHECKING, Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 import snowflake.connector
 from meltano.core.error import MeltanoError
@@ -19,6 +20,11 @@ from meltano.core.state_store.base import (
     StateIDLockedError,
     StateStoreManager,
 )
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Iterable
@@ -32,7 +38,7 @@ SNOWFLAKE_ACCOUNT = SettingDefinition(
     name="state_backend.snowflake.account",
     label="Snowflake Account",
     description="Snowflake account identifier",
-    kind=SettingKind.STRING,  # ty: ignore[invalid-argument-type]
+    kind=SettingKind.STRING,
     env_specific=True,
 )
 
@@ -40,7 +46,7 @@ SNOWFLAKE_USER = SettingDefinition(
     name="state_backend.snowflake.user",
     label="Snowflake User",
     description="Snowflake username",
-    kind=SettingKind.STRING,  # ty: ignore[invalid-argument-type]
+    kind=SettingKind.STRING,
     env_specific=True,
 )
 
@@ -48,7 +54,7 @@ SNOWFLAKE_PASSWORD = SettingDefinition(
     name="state_backend.snowflake.password",
     label="Snowflake Password",
     description="Snowflake password",
-    kind=SettingKind.STRING,  # ty: ignore[invalid-argument-type]
+    kind=SettingKind.STRING,
     sensitive=True,
     env_specific=True,
 )
@@ -57,7 +63,7 @@ SNOWFLAKE_WAREHOUSE = SettingDefinition(
     name="state_backend.snowflake.warehouse",
     label="Snowflake Warehouse",
     description="Snowflake compute warehouse",
-    kind=SettingKind.STRING,  # ty: ignore[invalid-argument-type]
+    kind=SettingKind.STRING,
     env_specific=True,
 )
 
@@ -65,7 +71,7 @@ SNOWFLAKE_DATABASE = SettingDefinition(
     name="state_backend.snowflake.database",
     label="Snowflake Database",
     description="Snowflake database name",
-    kind=SettingKind.STRING,  # ty: ignore[invalid-argument-type]
+    kind=SettingKind.STRING,
     env_specific=True,
 )
 
@@ -73,7 +79,7 @@ SNOWFLAKE_SCHEMA = SettingDefinition(
     name="state_backend.snowflake.schema",
     label="Snowflake Schema",
     description="Snowflake schema name",
-    kind=SettingKind.STRING,  # ty: ignore[invalid-argument-type]
+    kind=SettingKind.STRING,
     env_specific=True,
 )
 
@@ -81,7 +87,7 @@ SNOWFLAKE_ROLE = SettingDefinition(
     name="state_backend.snowflake.role",
     label="Snowflake Role",
     description="Snowflake role to use",
-    kind=SettingKind.STRING,  # ty: ignore[invalid-argument-type]
+    kind=SettingKind.STRING,
     env_specific=True,
 )
 
@@ -89,7 +95,7 @@ SNOWFLAKE_PRIVATE_KEY_BASE64 = SettingDefinition(
     name="state_backend.snowflake.private_key_base64",
     label="Snowflake Private Key (Base64-encoded DER)",
     description="Snowflake private key to use, in base64-encoded DER format",
-    kind=SettingKind.STRING,  # ty: ignore[invalid-argument-type]
+    kind=SettingKind.STRING,
     sensitive=True,
     env_specific=True,
 )
@@ -98,9 +104,14 @@ SNOWFLAKE_PRIVATE_KEY_BASE64 = SettingDefinition(
 class SnowflakeStateStoreManager(StateStoreManager):
     """State backend for Snowflake."""
 
-    label: str = "Snowflake"
     table_name: str = "meltano_state"
     lock_table_name: str = "meltano_state_locks"
+
+    @property
+    @override
+    def label(self) -> str:
+        """Get the label for this state store manager."""
+        return "Snowflake"  # pragma: no cover
 
     def __init__(
         self,
@@ -137,17 +148,17 @@ class SnowflakeStateStoreManager(StateStoreManager):
         query_params = parse_qs(parsed.query)
 
         # Extract connection details from URI and parameters
-        self.account = account or parsed.hostname
+        self.account = account or (unquote(parsed.hostname) if parsed.hostname else None)
         if not self.account:
             msg = "Snowflake account is required"
             raise MissingStateBackendSettingsError(msg)
 
-        self.user = user or parsed.username
+        self.user = user or (unquote(parsed.username) if parsed.username else None)
         if not self.user:
             msg = "Snowflake user is required"
             raise MissingStateBackendSettingsError(msg)
 
-        self.password = password or parsed.password
+        self.password = password or (unquote(parsed.password) if parsed.password else None)
         if (
             not self.password
             and not private_key_base64
@@ -363,7 +374,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
         self,
         state_id: str,
         *,
-        retry_seconds: int = 1,
+        retry_seconds: float = 1,
     ) -> Generator[None, None, None]:
         """Acquire a lock for the given job's state.
 
@@ -382,7 +393,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
 
         lock_id = str(uuid.uuid4())
         max_seconds = 30
-        seconds_waited = 0
+        seconds_waited = 0.0
 
         while seconds_waited < max_seconds:  # pragma: no branch
             try:
