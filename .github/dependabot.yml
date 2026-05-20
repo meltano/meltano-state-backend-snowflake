@@ -8,6 +8,8 @@ updates:
       actions:
         patterns:
           - "*"
+    cooldown:
+      default-days: 7
   - package-ecosystem: uv
     directory: "/"
     schedule:
@@ -23,3 +25,17 @@ updates:
         dependency-type: "development"
       lockfile-runtime:
         dependency-type: "production"
+    cooldown:
+      default-days: 7
+  - package-ecosystem: pre-commit
+    directory: "/"
+    schedule:
+      interval: monthly
+    groups:
+      hooks:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "chore: "
+    cooldown:
+      default-days: 7

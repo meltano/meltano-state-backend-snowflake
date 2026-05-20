@@ -1,3 +1,9 @@
+# Meltano
+**/.meltano
+
+# uv
+uv.lock
+
 # Python-generated files
 __pycache__/
 *.py[oc]

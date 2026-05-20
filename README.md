@@ -142,10 +142,16 @@ uv sync
 
 ### Run tests
 
-Run all tests, type checks, linting, and coverage:
+Run lint, type checks, and tests for the current Python version:
 
 ```bash
-uvx --with tox-uv tox run-parallel
+uvx --with tox-uv --with tox-gh tox -e lint,types,3.14
+```
+
+To run the full matrix (requires Python 3.10–3.14 installed locally):
+
+```bash
+uvx --with tox-uv --with tox-gh tox run-parallel
 ```
 
 ### Bump the version

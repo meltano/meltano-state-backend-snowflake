@@ -6,7 +6,6 @@ import base64
 import json
 import sys
 from contextlib import contextmanager
-from functools import cached_property
 from time import sleep
 from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, unquote, urlparse
@@ -185,6 +184,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
         pkey_base64 = private_key_base64 or query_params.get("private_key_base64", [None])[0]
         self.private_key = self._load_private_key(pkey_base64) if pkey_base64 else None
 
+        self._connection: snowflake.connector.SnowflakeConnection | None = None
         self._ensure_tables()
 
     def _load_private_key(self, pkey_base64: str) -> bytes:
@@ -204,7 +204,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
             encryption_algorithm=NoEncryption(),
         )
 
-    @cached_property
+    @property
     def connection(self) -> snowflake.connector.SnowflakeConnection:
         """Get a Snowflake connection.
 
@@ -212,6 +212,9 @@ class SnowflakeStateStoreManager(StateStoreManager):
             A Snowflake connection object.
 
         """
+        if self._connection is not None:
+            return self._connection
+
         conn_params: dict[str, Any] = {
             "account": self.account,
             "user": self.user,
@@ -227,7 +230,13 @@ class SnowflakeStateStoreManager(StateStoreManager):
         elif self.password:  # pragma: no branch
             conn_params["password"] = self.password
 
-        return snowflake.connector.connect(**conn_params)
+        self._connection = snowflake.connector.connect(**conn_params)
+        return self._connection
+
+    @connection.setter
+    def connection(self, value: snowflake.connector.SnowflakeConnection) -> None:
+        """Set the Snowflake connection (for testing/mocking)."""
+        self._connection = value
 
     def _ensure_tables(self) -> None:
         """Ensure the state and lock tables exist."""
@@ -253,6 +262,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
                 """,
             )
 
+    @override
     def set(self, state: MeltanoState) -> None:
         """Set the job state for the given state_id.
 
@@ -275,6 +285,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
                 (state.state_id, state.json()),
             )
 
+    @override
     def get(self, state_id: str) -> MeltanoState | None:
         """Get the job state for the given state_id.
 
@@ -310,6 +321,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
 
             return MeltanoState.from_json(state_id, state)
 
+    @override
     def delete(self, state_id: str) -> None:
         """Delete state for the given state_id.
 
@@ -323,6 +335,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
                 (state_id,),
             )
 
+    @override
     def clear_all(self) -> int:
         """Clear all states.
 
@@ -343,6 +356,7 @@ class SnowflakeStateStoreManager(StateStoreManager):
             )
             return count
 
+    @override
     def get_state_ids(self, pattern: str | None = None) -> Iterable[str]:
         """Get all state_ids available in this state store manager.
 
@@ -369,6 +383,14 @@ class SnowflakeStateStoreManager(StateStoreManager):
             for row in cursor:
                 yield row[0]
 
+    @override
+    def close(self) -> None:
+        """Close the state store manager and release any resources."""
+        if self._connection is not None:
+            self._connection.close()
+            self._connection = None
+
+    @override
     @contextmanager
     def acquire_lock(
         self,
