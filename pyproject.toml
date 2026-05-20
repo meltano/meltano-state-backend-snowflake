@@ -1,19 +1,15 @@
 [build-system]
 build-backend = "hatchling.build"
-requires = [ "hatchling", "hatch-vcs" ]
+requires = [ "hatch-vcs", "hatchling" ]
 
 [project]
 name = "meltano-state-backend-snowflake"
-dynamic = [ "version" ]
 description = "Meltano State Backend for Snowflake"
+readme = "README.md"
 license = "MIT"
 license-files = [
   "LICENSE",
 ]
-authors = [
-  { name = "Taylor Murphy", email = "taylor@arch.dev" },
-]
-readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
   "Programming Language :: Python :: 3 :: Only",
@@ -23,18 +19,16 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
 ]
+dynamic = [ "version" ]
 dependencies = [
   "cryptography>=42",
   "meltano>=3.7",
   "snowflake-connector-python>=4,<5",
-  "typing-extensions>=4.15.0 ; python_full_version < '3.12'",
+  "typing-extensions>=4.15; python_full_version<'3.12'",
 ]
-
-[project.urls]
-Documentation = "https://github.com/meltano/meltano-state-backend-snowflake"
-Source = "https://github.com/meltano/meltano-state-backend-snowflake"
-Issues = "https://github.com/meltano/meltano-state-backend-snowflake/issues"
-
+[[project.authors]]
+name = "Taylor Murphy"
+email = "taylor@arch.dev"
 [project.entry-points."meltano.settings"]
 snowflake_account = "meltano_state_backend_snowflake.backend:SNOWFLAKE_ACCOUNT"
 snowflake_database = "meltano_state_backend_snowflake.backend:SNOWFLAKE_DATABASE"
@@ -44,9 +38,15 @@ snowflake_schema = "meltano_state_backend_snowflake.backend:SNOWFLAKE_SCHEMA"
 snowflake_user = "meltano_state_backend_snowflake.backend:SNOWFLAKE_USER"
 snowflake_warehouse = "meltano_state_backend_snowflake.backend:SNOWFLAKE_WAREHOUSE"
 snowflake_private_key_base64 = "meltano_state_backend_snowflake.backend:SNOWFLAKE_PRIVATE_KEY_BASE64"
-
 [project.entry-points."meltano.state_backends"]
 snowflake = "meltano_state_backend_snowflake.backend:SnowflakeStateStoreManager"
+[[project.maintainers]]
+name = "Meltano Team"
+email = "hello@meltano.com"
+[project.urls]
+Documentation = "https://github.com/meltano/meltano-state-backend-snowflake"
+Source = "https://github.com/meltano/meltano-state-backend-snowflake"
+Issues = "https://github.com/meltano/meltano-state-backend-snowflake/issues"
 
 [dependency-groups]
 dev = [
@@ -59,21 +59,24 @@ lint = [
 ]
 tests = [
   "coverage[toml]>=7.13",
+  "packaging>=26.2",
   "pytest>=9",
 ]
 types = [
-  { include-group = "tests" },
   "mypy>=1.19",
   "ty>=0.0.14",
+  { include-group = "tests" },
 ]
 
 [tool.hatch.version]
 fallback-version = "0.0.0.dev0"
 source = "vcs"
 
+[tool.uv.sources]
+meltano = { git = "https://github.com/meltano/meltano.git", rev = "main" }
+
 [tool.ruff]
 line-length = 100
-
 [tool.ruff.lint]
 select = [
   "A",    # flake8-builtins
@@ -125,17 +128,32 @@ per-file-ignores."tests/**" = [
   "INP",  # Don't require __init__.py files in tests directories
   "S101", # Allow 'assert' in tests
 ]
-
 [tool.ruff.lint.flake8-annotations]
 allow-star-arg-any = true
 mypy-init-return = true
 suppress-dummy-args = true
-
 [tool.ruff.lint.flake8-pytest-style]
 parametrize-values-type = "tuple"
-
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.pyproject-fmt]
+table_format = "long"
+
+[tool.mypy]
+enable_error_code = [
+  "ignore-without-code",
+  "redundant-expr",
+  "truthy-bool",
+]
+follow_untyped_imports = true
+strict = true
+warn_unreachable = true
+warn_unused_configs = true
+warn_unused_ignores = true
+
+[tool.ty.rules]
+unused-type-ignore-comment = "ignore"
 
 [tool.pytest]
 addopts = [
@@ -146,11 +164,10 @@ addopts = [
 ]
 filterwarnings = [
   "error",
-  "once:The 'version' field in meltano.yml is deprecated:DeprecationWarning",
 ]
 log_level = "INFO"
 minversion = "9"
-testpaths = ["tests"]
+testpaths = [ "tests" ]
 xfail_strict = true
 
 [tool.coverage.paths]
@@ -158,7 +175,11 @@ package = [
   "src/meltano_state_backend_snowflake/",
   "*/site-packages/meltano_state_backend_snowflake/",
 ]
-
+[tool.coverage.report]
+exclude_also = [
+  "if (t\\.)?TYPE_CHECKING:",
+]
+fail_under = 100
 [tool.coverage.run]
 branch = true
 source = [
@@ -168,43 +189,21 @@ source = [
 parallel = true
 relative_files = true
 
-[tool.coverage.report]
-exclude_also = [
-  '''if (t\.)?TYPE_CHECKING:''',
-]
-fail_under = 100
-
 [tool.tox]
 min_version = "4.51"
-requires = [ "tox", "tox-uv" ]
+requires = [ "tox", "tox-uv", "tox-gh" ]
 env_list = [
   "types",
   "lint",
-  { product = [
-    { prefix = "3.", start = 10 },
-  ] },
+  { prefix = "3.", start = 10 },
+  "lowest",
   "coverage",
 ]
-
-[tool.tox.env_run_base]
-description = "run tests with coverage measurement on Python {py_dot_ver}"
-base_python_file = [ ".python-version" ]
-runner = "uv-venv-lock-runner"
-dependency_groups = [ "tests" ]
-commands = [
-  [
-    "coverage",
-    "run",
-    "-m",
-    "pytest",
-    { replace = "posargs", default = [ "tests" ], extend = true }
-  ]
-]
-
 [tool.tox.env.coverage]
 description = "combine and report coverage data"
 depends = [
   "3.*",
+  "lowest",
 ]
 dependency_groups = [ "tests" ]
 commands = [
@@ -222,6 +221,11 @@ commands = [
   [ "ruff", "format", "--exit-non-zero-on-format" ],
 ]
 
+[tool.tox.env.lowest]
+description = "run tests with lowest-direct requirements on Python {py_dot_ver}"
+base_python_file = []
+base_python = "3.10"
+uv_resolution = "lowest-direct"
 [tool.tox.env.types]
 description = "type check code with mypy and ty"
 dependency_groups = [ "tests", "types" ]
@@ -242,18 +246,15 @@ commands = [
     ], extend = true },
   ],
 ]
-
-[tool.mypy]
-enable_error_code = [
-  "ignore-without-code",
-  "redundant-expr",
-  "truthy-bool",
-]
-follow_untyped_imports = true
-strict = true
-warn_unreachable = true
-warn_unused_configs = true
-warn_unused_ignores = true
-
-[tool.ty.rules]
-unused-type-ignore-comment = "ignore"
+[tool.tox.env_run_base]
+description = "run tests with coverage measurement on Python {py_dot_ver}"
+base_python_file = [ ".python-version" ]
+runner = "uv-venv-runner"
+dependency_groups = [ "tests" ]
+commands = [ [ "coverage", "run", "-m", "pytest", { replace = "posargs", default = [ "tests" ], extend = true } ] ]
+[tool.tox.gh.python]
+"3.10" = [ "3.10", "lowest" ]
+"3.11" = [ "3.11" ]
+"3.12" = [ "3.12" ]
+"3.13" = [ "3.13" ]
+"3.14" = [ "3.14" ]

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import shutil
+from importlib.metadata import version
 from typing import TYPE_CHECKING
 from unittest import mock
 from urllib.parse import urlparse
@@ -11,10 +12,8 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from meltano.core.project import Project
 from meltano.core.state_store import MeltanoState, state_store_manager_from_project_settings
-from meltano.core.state_store.base import (
-    MissingStateBackendSettingsError,
-    StateIDLockedError,
-)
+from meltano.core.state_store.base import MissingStateBackendSettingsError, StateIDLockedError
+from packaging.version import Version
 
 from meltano_state_backend_snowflake.backend import SnowflakeStateStoreManager
 
@@ -29,7 +28,7 @@ def project(tmp_path: Path) -> Project:
     shutil.copytree(
         "fixtures/explicit",
         path,
-        ignore=shutil.ignore_patterns(".meltano/**"),
+        ignore=shutil.ignore_patterns(".meltano"),
     )
     return Project(path.resolve())
 
@@ -40,7 +39,7 @@ def project_with_uri(tmp_path: Path) -> Project:
     shutil.copytree(
         "fixtures/only_uri",
         path,
-        ignore=shutil.ignore_patterns(".meltano/**"),
+        ignore=shutil.ignore_patterns(".meltano"),
     )
     return Project(path.resolve())
 
@@ -747,3 +746,25 @@ def test_acquire_lock_multiple_retries_then_success(
         # Verify sleep was called 3 times (for the 3 failed attempts)
         assert mock_sleep.call_count == 3
         mock_sleep.assert_called_with(0.01)
+
+
+@pytest.mark.xfail(
+    condition=Version(version("meltano")) < Version("4.2.0"),
+    reason="Requires Meltano 4.2+ for context manager support on StateStoreManager",
+)
+def test_context_manager(
+    subject: tuple[SnowflakeStateStoreManager, mock.Mock],
+    mock_connection: tuple[mock.Mock, mock.Mock],
+) -> None:
+    """Test that close() closes the connection, and is a no-op when already closed."""
+    manager, _ = subject
+    mock_conn, _ = mock_connection
+
+    with manager:
+        assert manager._connection is not None
+
+    mock_conn.close.assert_called_once()
+
+    manager.close()  # no-op: _connection is already None
+    mock_conn.close.assert_called_once()  # still only called once
+    assert manager._connection is None
