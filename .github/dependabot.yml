@@ -10,13 +10,13 @@ updates:
           - "*"
     cooldown:
       default-days: 7
-  - package-ecosystem: uv
+  - package-ecosystem: pip
     directory: "/"
     schedule:
       interval: monthly
     allow:
       - dependency-type: all
-    versioning-strategy: lockfile-only
+    versioning-strategy: increase-if-necessary
     commit-message:
       prefix: "fix: "
       prefix-development: "chore: "
