@@ -63,8 +63,8 @@ tests = [
   "pytest>=9",
 ]
 types = [
-  "mypy>=1.19",
-  "ty>=0.0.14",
+  "mypy>=2.1",
+  "ty>=0.0.42",
   { include-group = "tests" },
 ]
 
@@ -190,8 +190,11 @@ parallel = true
 relative_files = true
 
 [tool.tox]
-min_version = "4.51"
-requires = [ "tox", "tox-uv", "tox-gh" ]
+requires = [
+  "tox>=4.55",
+  "tox-uv>=1.35",
+  "tox-gh>=1.7",
+]
 env_list = [
   "types",
   "lint",

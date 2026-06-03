@@ -5,8 +5,6 @@ ci:
   autoupdate_commit_msg: "chore: Update pre-commit hooks"
   autoupdate_schedule: quarterly
   submodules: false
-  skip:
-    - uv-lock
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -32,12 +30,6 @@ repos:
       - id: check-dependabot
       - id: check-github-workflows
       - id: check-meltano
-
-  - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: "0.11.16"
-    hooks:
-      - id: uv-lock
-      - id: uv-sync
 
   - repo: https://github.com/crate-ci/typos
     rev: v1.46.3
