@@ -138,16 +138,16 @@ convention = "google"
 table_format = "long"
 
 [tool.mypy]
+follow_untyped_imports = true
+warn_unused_ignores = true
+warn_unreachable = true
 enable_error_code = [
   "ignore-without-code",
   "redundant-expr",
   "truthy-bool",
 ]
-follow_untyped_imports = true
 strict = true
-warn_unreachable = true
 warn_unused_configs = true
-warn_unused_ignores = true
 
 [tool.ty.rules]
 unused-type-ignore-comment = "ignore"
@@ -189,33 +189,33 @@ relative_files = true
 [tool.tox]
 requires = [
   "tox>=4.55",
-  "tox-uv>=1.35",
   "tox-gh>=1.7",
+  "tox-uv>=1.35",
 ]
 env_list = [
-  "types",
+  "coverage",
   "lint",
   { prefix = "3.", start = 10 },
   "lowest",
-  "coverage",
+  "types",
 ]
 [tool.tox.env.coverage]
 description = "combine and report coverage data"
-depends = [
-  "3.*",
-  "lowest",
-]
 dependency_groups = [ "tests" ]
 commands = [
   [ "coverage", "combine", "--debug=pathmap" ],
   [ "coverage", "report", "--show-missing" ],
   [ "coverage", "xml" ],
 ]
+depends = [
+  "3.*",
+  "lowest",
+]
 
 [tool.tox.env.lint]
 description = "lint and format code with Ruff"
-dependency_groups = [ "lint" ]
 skip_install = true
+dependency_groups = [ "lint" ]
 commands = [
   [ "ruff", "check", "--fix", "--show-fixes", "--exit-non-zero-on-fix" ],
   [ "ruff", "format", "--exit-non-zero-on-format" ],
@@ -223,8 +223,8 @@ commands = [
 
 [tool.tox.env.lowest]
 description = "run tests with lowest-direct requirements on Python {py_dot_ver}"
-base_python_file = []
 base_python = "3.10"
+base_python_file = []
 uv_resolution = "lowest-direct"
 [tool.tox.env.types]
 description = "type check code with mypy and ty"
@@ -247,11 +247,11 @@ commands = [
   ],
 ]
 [tool.tox.env_run_base]
-description = "run tests with coverage measurement on Python {py_dot_ver}"
-base_python_file = [ ".python-version" ]
 runner = "uv-venv-runner"
+description = "run tests with coverage measurement on Python {py_dot_ver}"
 dependency_groups = [ "tests" ]
 commands = [ [ "coverage", "run", "-m", "pytest", { replace = "posargs", default = [ "tests" ], extend = true } ] ]
+base_python_file = [ ".python-version" ]
 [tool.tox.gh.python]
 "3.10" = [ "3.10", "lowest" ]
 "3.11" = [ "3.11" ]
