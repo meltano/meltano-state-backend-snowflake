@@ -249,9 +249,9 @@ commands = [
 [tool.tox.env_run_base]
 runner = "uv-venv-runner"
 description = "run tests with coverage measurement on Python {py_dot_ver}"
+base_python_file = [ ".python-version" ]
 dependency_groups = [ "tests" ]
 commands = [ [ "coverage", "run", "-m", "pytest", { replace = "posargs", default = [ "tests" ], extend = true } ] ]
-base_python_file = [ ".python-version" ]
 [tool.tox.gh.python]
 "3.10" = [ "3.10", "lowest" ]
 "3.11" = [ "3.11" ]
