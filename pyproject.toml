@@ -21,9 +21,9 @@ classifiers = [
 ]
 dynamic = [ "version" ]
 dependencies = [
-  "cryptography>=42",
+  "cryptography~=49.0",
   "meltano>=3.7",
-  "snowflake-connector-python>=4,<5",
+  "snowflake-connector-python>=4.7,<5",
   "typing-extensions>=4.15; python_full_version<'3.12'",
 ]
 [[project.authors]]
