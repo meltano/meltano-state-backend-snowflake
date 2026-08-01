@@ -211,7 +211,6 @@ depends = [
   "3.*",
   "lowest",
 ]
-
 [tool.tox.env.lint]
 description = "lint and format code with Ruff"
 skip_install = true
@@ -220,7 +219,6 @@ commands = [
   [ "ruff", "check", "--fix", "--show-fixes", "--exit-non-zero-on-fix" ],
   [ "ruff", "format", "--exit-non-zero-on-format" ],
 ]
-
 [tool.tox.env.lowest]
 description = "run tests with lowest-direct requirements on Python {py_dot_ver}"
 base_python = "3.10"
