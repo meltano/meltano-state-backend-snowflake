@@ -26,9 +26,16 @@ dependencies = [
   "snowflake-connector-python>=4.7,<5",
   "typing-extensions>=4.15; python_full_version<'3.12'",
 ]
+[[project.maintainers]]
+name = "Meltano Team"
+email = "hello@meltano.com"
 [[project.authors]]
 name = "Taylor Murphy"
 email = "taylor@arch.dev"
+[project.urls]
+Documentation = "https://github.com/meltano/meltano-state-backend-snowflake"
+Source = "https://github.com/meltano/meltano-state-backend-snowflake"
+Issues = "https://github.com/meltano/meltano-state-backend-snowflake/issues"
 [project.entry-points."meltano.settings"]
 snowflake_account = "meltano_state_backend_snowflake.backend:SNOWFLAKE_ACCOUNT"
 snowflake_database = "meltano_state_backend_snowflake.backend:SNOWFLAKE_DATABASE"
@@ -40,13 +47,6 @@ snowflake_warehouse = "meltano_state_backend_snowflake.backend:SNOWFLAKE_WAREHOU
 snowflake_private_key_base64 = "meltano_state_backend_snowflake.backend:SNOWFLAKE_PRIVATE_KEY_BASE64"
 [project.entry-points."meltano.state_backends"]
 snowflake = "meltano_state_backend_snowflake.backend:SnowflakeStateStoreManager"
-[[project.maintainers]]
-name = "Meltano Team"
-email = "hello@meltano.com"
-[project.urls]
-Documentation = "https://github.com/meltano/meltano-state-backend-snowflake"
-Source = "https://github.com/meltano/meltano-state-backend-snowflake"
-Issues = "https://github.com/meltano/meltano-state-backend-snowflake/issues"
 
 [dependency-groups]
 dev = [
@@ -167,6 +167,14 @@ minversion = "9"
 testpaths = [ "tests" ]
 xfail_strict = true
 
+[tool.coverage.run]
+branch = true
+source = [
+  "meltano_state_backend_snowflake",
+  "tests",
+]
+parallel = true
+relative_files = true
 [tool.coverage.paths]
 package = [
   "src/meltano_state_backend_snowflake/",
@@ -177,14 +185,6 @@ exclude_also = [
   "if (t\\.)?TYPE_CHECKING:",
 ]
 fail_under = 100
-[tool.coverage.run]
-branch = true
-source = [
-  "meltano_state_backend_snowflake",
-  "tests",
-]
-parallel = true
-relative_files = true
 
 [tool.tox]
 requires = [
