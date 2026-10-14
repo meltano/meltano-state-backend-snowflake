@@ -55,6 +55,16 @@ def pkey_base64() -> str:
     return base64.b64encode(dummy_pem).decode("utf-8")
 
 
+@pytest.fixture
+def encrypted_pem() -> str:
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    return key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.BestAvailableEncryption(b"secret"),
+    ).decode()
+
+
 def test_get_manager(project: Project) -> None:
     with mock.patch(
         "meltano_state_backend_snowflake.backend.SnowflakeStateStoreManager._ensure_tables",
@@ -593,6 +603,49 @@ def test_private_key_without_password(pkey_base64: str) -> None:
     )
     assert manager.private_key == expected_der
     assert manager.password is None
+
+
+@pytest.mark.usefixtures("mock_connection")
+@pytest.mark.parametrize("as_base64", (False, True), ids=("pem", "base64"))
+def test_encrypted_private_key_with_passphrase(encrypted_pem: str, *, as_base64: bool) -> None:
+    kwargs: dict[str, str] = (
+        {"private_key_base64": base64.b64encode(encrypted_pem.encode()).decode()}
+        if as_base64
+        else {"private_key": encrypted_pem}
+    )
+    manager = SnowflakeStateStoreManager(
+        uri="snowflake://myuser@myaccount/mydb?warehouse=mywh",
+        private_key_passphrase="secret",  # noqa: S106
+        **kwargs,
+    )
+    expected = serialization.load_pem_private_key(
+        encrypted_pem.encode(),
+        password=b"secret",
+    ).private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    assert manager.private_key == expected
+
+
+@pytest.mark.usefixtures("mock_connection")
+def test_encrypted_private_key_missing_passphrase(encrypted_pem: str) -> None:
+    with pytest.raises(MissingStateBackendSettingsError, match="private_key_passphrase"):
+        SnowflakeStateStoreManager(
+            uri="snowflake://myuser@myaccount/mydb?warehouse=mywh",
+            private_key=encrypted_pem,
+        )
+
+
+@pytest.mark.usefixtures("mock_connection")
+def test_unencrypted_private_key_with_passphrase(pkey_base64: str) -> None:
+    manager = SnowflakeStateStoreManager(
+        uri="snowflake://myuser@myaccount/mydb?warehouse=mywh",
+        private_key_base64=pkey_base64,
+        private_key_passphrase="unused",  # noqa: S106
+    )
+    assert manager.private_key
 
 
 def test_missing_warehouse_validation() -> None:

@@ -99,6 +99,24 @@ SNOWFLAKE_PRIVATE_KEY_BASE64 = SettingDefinition(
     env_specific=True,
 )
 
+SNOWFLAKE_PRIVATE_KEY = SettingDefinition(
+    name="state_backend.snowflake.private_key",
+    label="Snowflake Private Key",
+    description="Snowflake private key to use, in PEM format (optionally encrypted)",
+    kind=SettingKind.STRING,
+    sensitive=True,
+    env_specific=True,
+)
+
+SNOWFLAKE_PRIVATE_KEY_PASSPHRASE = SettingDefinition(
+    name="state_backend.snowflake.private_key_passphrase",
+    label="Snowflake Private Key Passphrase",
+    description="Passphrase to decrypt the Snowflake private key, if it is encrypted",
+    kind=SettingKind.STRING,
+    sensitive=True,
+    env_specific=True,
+)
+
 
 class SnowflakeStateStoreManager(StateStoreManager):
     """State backend for Snowflake."""
@@ -124,6 +142,8 @@ class SnowflakeStateStoreManager(StateStoreManager):
         schema: str | None = None,
         role: str | None = None,
         private_key_base64: str | None = None,
+        private_key: str | None = None,
+        private_key_passphrase: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the SnowflakeStateStoreManager.
@@ -137,7 +157,11 @@ class SnowflakeStateStoreManager(StateStoreManager):
             database: Snowflake database name
             schema: Snowflake schema name (default: PUBLIC)
             role: Optional Snowflake role to use
-            private_key_base64: Optional Snowflake private key to use, in base64-encoded DER format
+            private_key_base64: Optional Snowflake private key to use, in base64-encoded format
+                (PEM or DER, optionally encrypted)
+            private_key: Optional Snowflake private key to use, in PEM format
+                (optionally encrypted)
+            private_key_passphrase: Optional passphrase for an encrypted private key
             kwargs: Additional keyword args to pass to parent
 
         """
@@ -147,20 +171,23 @@ class SnowflakeStateStoreManager(StateStoreManager):
         query_params = parse_qs(parsed.query)
 
         # Extract connection details from URI and parameters
-        self.account = account or (unquote(parsed.hostname) if parsed.hostname else None)
-        if not self.account:
+        account = account or (unquote(parsed.hostname) if parsed.hostname else None)
+        if not account:
             msg = "Snowflake account is required"
             raise MissingStateBackendSettingsError(msg)
+        self.account = account
 
-        self.user = user or (unquote(parsed.username) if parsed.username else None)
-        if not self.user:
+        user = user or (unquote(parsed.username) if parsed.username else None)
+        if not user:
             msg = "Snowflake user is required"
             raise MissingStateBackendSettingsError(msg)
+        self.user = user
 
         self.password = password or (unquote(parsed.password) if parsed.password else None)
         if (
             not self.password
             and not private_key_base64
+            and not private_key
             and not query_params.get("private_key_base64")
         ):
             msg = "Snowflake password or private key is required"
@@ -182,21 +209,51 @@ class SnowflakeStateStoreManager(StateStoreManager):
         self.role = role or query_params.get("role", [None])[0]
 
         pkey_base64 = private_key_base64 or query_params.get("private_key_base64", [None])[0]
-        self.private_key = self._load_private_key(pkey_base64) if pkey_base64 else None
+        passphrase = private_key_passphrase or query_params.get("private_key_passphrase", [None])[0]
+        pkey_bytes: bytes | None = None
+        if private_key:
+            pkey_bytes = private_key.encode()
+        elif pkey_base64:
+            pkey_bytes = base64.b64decode(pkey_base64)
+        self.private_key = self._load_private_key(pkey_bytes, passphrase) if pkey_bytes else None
 
         self._connection: snowflake.connector.SnowflakeConnection | None = None
         self._ensure_tables()
 
-    def _load_private_key(self, pkey_base64: str) -> bytes:
+    def _load_private_key(self, key_data: bytes, passphrase: str | None = None) -> bytes:
         from cryptography.hazmat.primitives.serialization import (
             Encoding,
             NoEncryption,
             PrivateFormat,
+            load_der_private_key,
             load_pem_private_key,
         )
 
-        # We assume the value is a PEM private key
-        private_key = load_pem_private_key(base64.b64decode(pkey_base64), password=None)
+        loader = load_pem_private_key if b"-----BEGIN" in key_data else load_der_private_key
+        key_data = key_data.strip()
+        try:
+            try:
+                private_key = loader(
+                    key_data,
+                    password=passphrase.encode() if passphrase else None,
+                )
+            except TypeError:
+                if not passphrase:
+                    raise
+                # A passphrase was given but the key is not encrypted; ignore it.
+                private_key = loader(key_data, password=None)
+        except TypeError as e:
+            msg = (
+                "Snowflake state backend private key is encrypted but no "
+                "private_key_passphrase was provided"
+            )
+            raise MissingStateBackendSettingsError(msg) from e
+        except ValueError as e:
+            msg = (
+                "Snowflake state backend could not load the private key. "
+                "Check the key format and private_key_passphrase"
+            )
+            raise SnowflakeStateBackendError(msg) from e
 
         return private_key.private_bytes(
             encoding=Encoding.DER,

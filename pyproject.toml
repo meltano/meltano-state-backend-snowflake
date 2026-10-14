@@ -45,6 +45,8 @@ snowflake_role = "meltano_state_backend_snowflake.backend:SNOWFLAKE_ROLE"
 snowflake_schema = "meltano_state_backend_snowflake.backend:SNOWFLAKE_SCHEMA"
 snowflake_user = "meltano_state_backend_snowflake.backend:SNOWFLAKE_USER"
 snowflake_warehouse = "meltano_state_backend_snowflake.backend:SNOWFLAKE_WAREHOUSE"
+snowflake_private_key = "meltano_state_backend_snowflake.backend:SNOWFLAKE_PRIVATE_KEY"
+snowflake_private_key_passphrase = "meltano_state_backend_snowflake.backend:SNOWFLAKE_PRIVATE_KEY_PASSPHRASE"
 snowflake_private_key_base64 = "meltano_state_backend_snowflake.backend:SNOWFLAKE_PRIVATE_KEY_BASE64"
 [project.entry-points."meltano.state_backends"]
 snowflake = "meltano_state_backend_snowflake.backend:SnowflakeStateStoreManager"
