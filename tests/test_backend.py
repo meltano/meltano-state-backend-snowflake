@@ -15,7 +15,10 @@ from meltano.core.state_store import MeltanoState, state_store_manager_from_proj
 from meltano.core.state_store.base import MissingStateBackendSettingsError, StateIDLockedError
 from packaging.version import Version
 
-from meltano_state_backend_snowflake.backend import SnowflakeStateStoreManager
+from meltano_state_backend_snowflake.backend import (
+    SnowflakeStateBackendError,
+    SnowflakeStateStoreManager,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -635,6 +638,32 @@ def test_encrypted_private_key_missing_passphrase(encrypted_pem: str) -> None:
         SnowflakeStateStoreManager(
             uri="snowflake://myuser@myaccount/mydb?warehouse=mywh",
             private_key=encrypted_pem,
+        )
+
+
+@pytest.mark.usefixtures("mock_connection")
+@pytest.mark.parametrize(
+    ("key", "passphrase"),
+    (
+        pytest.param("encrypted_pem", "wrong", id="wrong-passphrase"),
+        pytest.param("garbage", None, id="malformed-key"),
+    ),
+)
+def test_private_key_load_failure(
+    request: pytest.FixtureRequest,
+    key: str,
+    passphrase: str | None,
+) -> None:
+    private_key = (
+        request.getfixturevalue(key)
+        if key == "encrypted_pem"
+        else ("-----BEGIN PRIVATE KEY-----\nnot a key\n-----END PRIVATE KEY-----")
+    )
+    with pytest.raises(SnowflakeStateBackendError, match="could not load the private key"):
+        SnowflakeStateStoreManager(
+            uri="snowflake://myuser@myaccount/mydb?warehouse=mywh",
+            private_key=private_key,
+            private_key_passphrase=passphrase,
         )
 
 
