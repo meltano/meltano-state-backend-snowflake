@@ -83,7 +83,9 @@ state_backend:
 - **database**: The database where state will be stored
 - **schema**: The schema where state tables will be created (defaults to PUBLIC)
 - **role**: Optional role to use for the connection
-- **private_key_base64**: Optional base64-encoded DER private key for key pair authentication
+- **private_key_base64**: Optional base64-encoded private key (PEM or DER, optionally encrypted) for key pair authentication
+- **private_key**: Optional PEM private key (may be encrypted) for key pair authentication
+- **private_key_passphrase**: Passphrase for an encrypted private key
 
 #### Key Pair Authentication
 
@@ -93,7 +95,7 @@ Instead of password-based authentication, you can use [Snowflake key pair authen
 state_backend:
   uri: snowflake://my_user@my_account/my_database?warehouse=my_warehouse
   snowflake:
-    private_key_base64: MIIEvgIBADANBg...  # base64-encoded DER private key
+    private_key_base64: MIIEvgIBADANBg...  # base64-encoded private key
 ```
 
 The private key can also be passed as a URI query parameter:
