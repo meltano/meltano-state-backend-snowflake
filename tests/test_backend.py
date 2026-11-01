@@ -358,7 +358,7 @@ def test_get_state_ids_with_pattern(
     # Get state IDs with pattern
     state_ids = list(manager.get_state_ids("test_*"))
 
-    # Verify query with LIKE and fully qualified table name (skip table creation calls)  # noqa: E501
+    # Verify query with LIKE and fully qualified table name (skip table creation calls)
     select_calls = [
         call for call in mock_cursor.execute.call_args_list if "SELECT state_id FROM" in call[0][0]
     ]
@@ -410,7 +410,7 @@ def test_acquire_lock(
 
     # Test successful lock acquisition
     with manager.acquire_lock("test_job", retry_seconds=0):
-        # Verify INSERT query for lock with fully qualified table name (skip table creation calls)  # noqa: E501
+        # Verify INSERT query for lock with fully qualified table name (skip table creation calls)
         insert_calls = [
             call
             for call in mock_cursor.execute.call_args_list
@@ -419,7 +419,7 @@ def test_acquire_lock(
         assert len(insert_calls) >= 1
         assert "INSERT INTO testdb.testschema.meltano_state_locks" in insert_calls[0][0][0]
 
-    # Verify DELETE queries for lock release and cleanup with fully qualified table names  # noqa: E501
+    # Verify DELETE queries for lock release and cleanup with fully qualified table names
     delete_calls = [
         call
         for call in mock_cursor.execute.call_args_list
